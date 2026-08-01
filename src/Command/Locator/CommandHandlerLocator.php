@@ -2,7 +2,6 @@
 
 namespace Componenta\CQRS\Command\Locator;
 
-use Componenta\CQRS\Handler\DirectHandlerCallable;
 use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Psr\Container\ContainerInterface;
@@ -20,7 +19,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
    use CommandNameResolution;
 
     /**
-     * @param array<string, mixed> $map
+     * @param array<string, callable|array{0: class-string, 1: string}> $map
      */
     public function __construct(
         private array $map = [],
@@ -67,9 +66,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
             }
 
             $handler = $this->container->get($entry[0]);
-            $callable = ($entry[2] ?? false) === true
-                ? new DirectHandlerCallable($handler, $entry[1])
-                : ($entry[1] === '__invoke' ? $handler : $handler->{$entry[1]}(...));
+            $callable = $entry[1] === '__invoke' ? $handler : $handler->{$entry[1]}(...);
             $this->map[$commandName] = $callable;
 
             return $callable;

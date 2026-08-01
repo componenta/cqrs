@@ -2,7 +2,6 @@
 
 namespace Componenta\CQRS\Query\Locator;
 
-use Componenta\CQRS\Handler\DirectHandlerCallable;
 use Componenta\CQRS\Query\Exception\HandlerNotFoundException;
 use Componenta\CQRS\Query\Resolver\QueryNameResolution;
 use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
@@ -29,12 +28,9 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
 {
     use QueryNameResolution;
 
-    /** @var array<string, mixed> */
+    /** @var array<string, callable|array{0: class-string, 1: string}> */
     private array $map;
 
-    /**
-     * @param array<string, mixed> $map
-     */
     public function __construct(
         array $map = [],
         ?QueryNameResolverInterface $resolver = null,
@@ -75,9 +71,7 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
             }
 
             $handler = $this->container->get($entry[0]);
-            $callable = ($entry[2] ?? false) === true
-                ? new DirectHandlerCallable($handler, $entry[1])
-                : ($entry[1] === '__invoke' ? $handler : $handler->{$entry[1]}(...));
+            $callable = $entry[1] === '__invoke' ? $handler : $handler->{$entry[1]}(...);
             $this->map[$queryName] = $callable; // memoise
 
             return $callable;
