@@ -14,7 +14,7 @@
         "php": ">=8.4",
         "componenta/arrayable": "^1.0",
         "componenta/config": "^1.0",
-        "componenta/di": "^2.0@dev",
+        "componenta/di": "^2.0",
         "componenta/iterator": "^1.0",
         "componenta/reflection": "^1.0",
         "psr/container": "^2.0",
