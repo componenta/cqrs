@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Componenta\Config\Config;
 use Componenta\CQRS\Command\CommandBus;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
@@ -13,6 +14,9 @@ use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
+use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\ConfigCqrsMapProvider;
+use Componenta\CQRS\Tests\Fixture\FakeContainer;
 
 final readonly class CommandBusContractCommand
 {
@@ -121,7 +125,6 @@ it('propagates exceptions from the terminal command handler', function () {
 
 it('dispatches command listeners in priority order', function () {
     $observed = new ArrayObject();
-    $locator = new CommandListenersLocator();
     $makeListener = static function (string $name) use ($observed): CommandListenerInterface {
         return new readonly class($observed, $name) implements CommandListenerInterface {
             public function __construct(private ArrayObject $observed, private string $name) {}
@@ -132,19 +135,31 @@ it('dispatches command listeners in priority order', function () {
             }
         };
     };
-
-    $locator->register(
-        CommandBusContractCommand::class,
-        $makeListener('low'),
-        [CommandProcessEvent::class],
-        priority: -10,
-    );
-    $locator->register(
-        CommandBusContractCommand::class,
-        $makeListener('high'),
-        [CommandProcessEvent::class],
-        priority: 50,
-    );
+    $provider = new ConfigCqrsMapProvider(new Config([
+        ConfigKey::CQRS_MAP => [
+            'version' => 2,
+            'commands' => [
+                'listeners' => [
+                    CommandBusContractCommand::class => [
+                        [
+                            'service' => 'listener.low',
+                            'events' => [CommandProcessEvent::class],
+                            'priority' => -10,
+                        ],
+                        [
+                            'service' => 'listener.high',
+                            'events' => [CommandProcessEvent::class],
+                            'priority' => 50,
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]));
+    $locator = new CommandListenersLocator($provider, new FakeContainer([
+        'listener.low' => $makeListener('low'),
+        'listener.high' => $makeListener('high'),
+    ]));
 
     $bus = new CommandBus(makeCommandBusTerminal(), new EventMiddleware($locator, suppressExceptions: false));
 

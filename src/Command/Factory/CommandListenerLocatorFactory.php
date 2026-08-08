@@ -1,25 +1,48 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Command\Factory;
 
-use Componenta\Config\Config;
 use Componenta\CQRS\Command\Locator\CommandListenersLocator;
+use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\CqrsMapProviderInterface;
+use LogicException;
 use Psr\Container\ContainerInterface;
 
 final class CommandListenerLocatorFactory
 {
-    public function __invoke(ContainerInterface $container): CommandListenersLocator
+    public function __invoke(ContainerInterface $container): CommandListenersLocatorInterface
     {
-        /** @var Config $config */
-        $config = $container->get(ConfigKey::CONFIG);
+        $mapProvider = $container->get(CqrsMapProviderInterface::class);
+
+        if (!$mapProvider instanceof CqrsMapProviderInterface) {
+            throw new LogicException(sprintf(
+                'Container entry "%s" must implement %s.',
+                CqrsMapProviderInterface::class,
+                CqrsMapProviderInterface::class,
+            ));
+        }
+
+        $resolver = null;
+
+        if ($container->has(CommandNameResolverInterface::class)) {
+            $resolver = $container->get(CommandNameResolverInterface::class);
+
+            if (!$resolver instanceof CommandNameResolverInterface) {
+                throw new LogicException(sprintf(
+                    'Container entry "%s" must implement %s.',
+                    CommandNameResolverInterface::class,
+                    CommandNameResolverInterface::class,
+                ));
+            }
+        }
 
         return new CommandListenersLocator(
-            $config->get(ConfigKey::COMMAND_LISTENER_MAP, []),
-            $container->has(CommandNameResolverInterface::class)
-                ? $container->get(CommandNameResolverInterface::class) : null,
+            $mapProvider,
             $container,
+            $resolver,
         );
     }
 }

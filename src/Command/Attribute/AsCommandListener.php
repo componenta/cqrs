@@ -26,7 +26,7 @@ final readonly class AsCommandListener
     }
 
     /**
-     * @param list<class-string> $eventTypes
+     * @param list<string> $eventTypes
      * @throws InvalidArgumentException
      */
     public static function assertEventTypes(array $eventTypes): void

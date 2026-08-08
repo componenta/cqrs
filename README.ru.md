@@ -39,8 +39,12 @@ composer require componenta/cqrs
 ## Быстрый старт
 
 ```php
+use Componenta\Config\ConfigLoader;
 use Componenta\CQRS\Command\CommandBusInterface;
 use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\CqrsMap;
+use Componenta\CQRS\Map\HandlerDescriptor;
+use Componenta\DI\ContainerBuilder;
 
 final readonly class CalculateTotalCommand
 {
@@ -58,13 +62,19 @@ final readonly class CalculateTotalHandler
     }
 }
 
-return [
+$config = ConfigLoader::load(
+    null,
     new Componenta\CQRS\ConfigProvider(),
-
-    ConfigKey::COMMAND_HANDLER_MAP => [
-        CalculateTotalCommand::class => [CalculateTotalHandler::class, '__invoke'],
+    static fn(): array => [
+        ConfigKey::CQRS_MAP => (new CqrsMap(
+            commandHandlers: [
+                CalculateTotalCommand::class
+                    => new HandlerDescriptor(CalculateTotalHandler::class, '__invoke'),
+            ],
+        ))->toArray(),
     ],
-];
+);
+$container = ContainerBuilder::configure($config)->build();
 
 /** @var CommandBusInterface $commands */
 $commands = $container->get(CommandBusInterface::class);
@@ -89,10 +99,10 @@ Provider регистрирует:
 |---|---|
 | `CommandBusInterface` | Выполняет команды через настроенную command middleware chain. |
 | `QueryBusInterface` | Выполняет запросы через настроенную query middleware chain. |
-| `CommandHandlerLocatorInterface` | Читает `ConfigKey::COMMAND_HANDLER_MAP`. |
-| `CommandListenersLocatorInterface` | Читает `ConfigKey::COMMAND_LISTENER_MAP`. |
-| `QueryHandlerLocatorInterface` | Читает `ConfigKey::QUERY_HANDLER_MAP`. |
-| `CommandAttributeProviderInterface` | Читает `#[Async]`, `#[Retry]` и `#[Lock]` из compiled maps или reflection. |
+| `CommandHandlerLocatorInterface` | Разрешает дескрипторы обработчиков команд из активного `CqrsMapProviderInterface`. |
+| `CommandListenersLocatorInterface` | Фильтрует и разрешает дескрипторы слушателей из того же снимка карты. |
+| `QueryHandlerLocatorInterface` | Разрешает дескрипторы обработчиков запросов из того же снимка карты. |
+| `CommandMetadataProviderInterface` | Возвращает любой зарегистрированный тип атрибута команды из карты v2; reflection используется только для неизвестных карте команд. |
 
 Основные ключи:
 
@@ -100,19 +110,18 @@ Provider регистрирует:
 |---|---|
 | `ConfigKey::COMMAND_MIDDLEWARES` | Список command middleware в порядке выполнения. |
 | `ConfigKey::QUERY_MIDDLEWARES` | Список query middleware в порядке выполнения. |
-| `ConfigKey::COMMAND_HANDLER_MAP` | Карта `Command::class => callable|[Handler::class, method]`. |
-| `ConfigKey::COMMAND_LISTENER_MAP` | Карта command event listeners. |
-| `ConfigKey::QUERY_HANDLER_MAP` | Карта `Query::class => callable|[Handler::class, method]`. |
-| `ConfigKey::COMMAND_ATTRIBUTE_MAP` | Compiled metadata для `#[Async]`, `#[Retry]` и `#[Lock]`. |
-| `ConfigKey::COMPILED_MAPS` | Включает compiled maps. |
+| `ConfigKey::CQRS_MAP` | Единый версионированный артефакт с обработчиками команд и запросов, слушателями, метаданными и известными командами. |
+| `ConfigKey::COMMAND_METADATA_ATTRIBUTES` | Классы атрибутов, которые должен обнаружить и скомпилировать `componenta/cqrs-app`. Дополнительные пакеты добавляют сюда свои атрибуты. |
 
-`Componenta\CQRS\ConfigProvider` по умолчанию регистрирует пустые command/query middleware lists. Middleware из optional packages добавляется приложением, когда нужны authorization, retries, locks, transactions, async execution или workers.
+Отсутствие ключа middleware означает пустую цепочку. Middleware из дополнительных пакетов добавляется приложением, когда нужны проверки прав, повторные попытки, блокировки, транзакции, асинхронное выполнение или воркеры.
+
+Пустые секции карты не записываются: пустой валидный артефакт имеет вид `['version' => 2]`. В `APP_ENV=production` актуальная карта обязательна. В остальных окружениях `componenta/cqrs-app` может добавить к пустой базовой карте данные текущего обнаружения классов. Старые ключи карт и неподдерживаемые версии завершаются ошибкой с требованием очистить кеши и выполнить `app:build`.
 
 ## Команды
 
 Команда — объект с данными для сценария, который меняет состояние. `CommandBusInterface::dispatch(object $command, array $attributes = [])` возвращает immutable `OperationInterface` с id операции, attributes и result, если команда выполнена синхронно.
 
-Handlers ищутся через `CommandHandlerLocatorInterface`. Запись handler map может быть callable или парой `[class-string, method-string]`. Пары class/method лениво резолвятся через контейнер.
+Обработчики ищутся через `CommandHandlerLocatorInterface`. Дескриптор карты хранит id сервиса и метод; callable лениво разрешается через контейнер и запоминается локатором.
 
 `#[AsCommandHandler(?string $command = null)]` — discovery metadata для `componenta/cqrs-app`. Если command не указан, `cqrs-app` выводит его из параметра handler.
 
@@ -140,9 +149,9 @@ Core middleware:
 |---|---|---|---|
 | `#[AsCommandHandler]` | class или method | `?string $command = null` | Discovery metadata для command handlers. |
 | `#[AsCommandListener]` | class | `string $command, int $priority = 0, array $eventTypes = []` | Discovery metadata для command event listeners. |
-| `#[Async]` | command class | `string $transport = 'default', int $delay = 0` | Metadata для `componenta/cqrs-transport`. |
-| `#[Retry]` | command class | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Metadata для `componenta/cqrs-retry`. |
-| `#[Lock]` | command class | `string $key, float $ttl = 300.0, bool $blocking = true` | Metadata для `componenta/cqrs-lock`. |
+| `#[Componenta\CQRS\Transport\Attribute\Async]` | класс команды | `string $transport = 'default', int $delay = 0` | Метаданные из `componenta/cqrs-transport`. |
+| `#[Componenta\CQRS\Retry\Attribute\Retry]` | класс команды | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Метаданные из `componenta/cqrs-retry`. |
+| `#[Componenta\CQRS\Lock\Attribute\Lock]` | класс команды | `string $key, float $ttl = 300.0, bool $blocking = true` | Метаданные из `componenta/cqrs-lock`. |
 
 
 ## События команд
@@ -178,7 +187,7 @@ Handlers ищутся через `QueryHandlerLocatorInterface`. `#[AsQueryHandl
 | Command chain step | `Componenta\CQRS\Command\Middleware\MiddlewareInterface` | Нужен custom step вокруг command execution. |
 | Query chain step | `Componenta\CQRS\Query\Middleware\MiddlewareInterface` | Нужен custom step вокруг query execution. |
 | Command event listeners | `CommandListenerInterface` | Side effect должен реагировать на command events без изменения command handler. |
-| Command metadata | `CommandAttributeProviderInterface` | `#[Async]`, `#[Retry]` и `#[Lock]` должны приходить не из reflection или стандартной compiled map. |
+| Метаданные команд | `CommandMetadataProviderInterface` | Метод `get($command, Attribute::class)` универсален; дополнительные пакеты регистрируют классы атрибутов через config. |
 
 ## Ошибки
 
@@ -188,3 +197,17 @@ Handlers ищутся через `QueryHandlerLocatorInterface`. `#[AsQueryHandl
 | Некорректный command handler | `Componenta\CQRS\Command\Exception\InvalidHandlerException` |
 | Query handler не найден | `Componenta\CQRS\Query\Exception\HandlerNotFoundException` |
 
+
+## Переход с v1
+
+| v1 | v2 |
+|---|---|
+| `COMMAND_HANDLER_MAP` | `CQRS_MAP['commands']['handlers']` |
+| `QUERY_HANDLER_MAP` | `CQRS_MAP['queries']['handlers']` |
+| `COMMAND_LISTENER_MAP` | `CQRS_MAP['commands']['listeners']` |
+| `COMMAND_ATTRIBUTE_MAP` | `CQRS_MAP['commands']['metadata']` |
+| `COMPILED_MAPS` | Удалён: режим определяется версией карты и окружением. |
+| `CommandAttributeProviderInterface` | `CommandMetadataProviderInterface` |
+| `async()/retry()/lock()` | `get($command, Attribute::class)` |
+
+После обновления удалите кеши конфигурации, обнаружения классов, старых CQRS-карт, generated resolver и release fingerprint, затем выполните `APP_ENV=development php bin/console.php app:build`.

@@ -40,7 +40,11 @@ composer require componenta/cqrs
 
 ```php
 use Componenta\CQRS\Command\CommandBusInterface;
+use Componenta\Config\ConfigLoader;
+use Componenta\DI\ContainerBuilder;
 use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\CqrsMap;
+use Componenta\CQRS\Map\HandlerDescriptor;
 
 final readonly class CalculateTotalCommand
 {
@@ -58,13 +62,19 @@ final readonly class CalculateTotalHandler
     }
 }
 
-return [
+$config = ConfigLoader::load(
+    null,
     new Componenta\CQRS\ConfigProvider(),
-
-    ConfigKey::COMMAND_HANDLER_MAP => [
-        CalculateTotalCommand::class => [CalculateTotalHandler::class, '__invoke'],
+    static fn(): array => [
+        ConfigKey::CQRS_MAP => (new CqrsMap(
+            commandHandlers: [
+                CalculateTotalCommand::class
+                    => new HandlerDescriptor(CalculateTotalHandler::class, '__invoke'),
+            ],
+        ))->toArray(),
     ],
-];
+);
+$container = ContainerBuilder::configure($config)->build();
 
 /** @var CommandBusInterface $commands */
 $commands = $container->get(CommandBusInterface::class);
@@ -89,10 +99,10 @@ The provider registers:
 |---|---|
 | `CommandBusInterface` | Dispatches commands through the configured command middleware chain. |
 | `QueryBusInterface` | Handles queries through the configured query middleware chain. |
-| `CommandHandlerLocatorInterface` | Reads `ConfigKey::COMMAND_HANDLER_MAP`. |
-| `CommandListenersLocatorInterface` | Reads `ConfigKey::COMMAND_LISTENER_MAP`. |
-| `QueryHandlerLocatorInterface` | Reads `ConfigKey::QUERY_HANDLER_MAP`. |
-| `CommandAttributeProviderInterface` | Reads `#[Async]`, `#[Retry]`, and `#[Lock]` from compiled maps or reflection. |
+| `CommandHandlerLocatorInterface` | Resolves command handler descriptors from the active `CqrsMapProviderInterface`. |
+| `CommandListenersLocatorInterface` | Filters and resolves command listener descriptors from the same map snapshot. |
+| `QueryHandlerLocatorInterface` | Resolves query handler descriptors from the same map snapshot. |
+| `CommandMetadataProviderInterface` | Returns any registered command attribute type from the v2 map, with reflection fallback only for unknown commands. |
 
 Important keys:
 
@@ -100,19 +110,53 @@ Important keys:
 |---|---|
 | `ConfigKey::COMMAND_MIDDLEWARES` | Command middleware list in execution order. |
 | `ConfigKey::QUERY_MIDDLEWARES` | Query middleware list in execution order. |
-| `ConfigKey::COMMAND_HANDLER_MAP` | `Command::class => callable|[Handler::class, method]` map. |
-| `ConfigKey::COMMAND_LISTENER_MAP` | Command event listener map. |
-| `ConfigKey::QUERY_HANDLER_MAP` | `Query::class => callable|[Handler::class, method]` map. |
-| `ConfigKey::COMMAND_ATTRIBUTE_MAP` | Compiled metadata for `#[Async]`, `#[Retry]`, and `#[Lock]`. |
-| `ConfigKey::COMPILED_MAPS` | Enables compiled maps. |
+| `ConfigKey::CQRS_MAP` | One versioned artifact containing command handlers, listeners, metadata, known commands, and query handlers. |
+| `ConfigKey::COMMAND_METADATA_ATTRIBUTES` | Attribute classes that `componenta/cqrs-app` must discover and compile. Optional packages append their own classes. |
 
-`Componenta\CQRS\ConfigProvider` registers empty command and query middleware lists by default. Add optional middleware from the packages listed above when the application needs authorization, retries, locks, transactions, async execution, or workers.
+Missing middleware keys mean an empty chain. Add optional middleware from the packages listed above when the application needs authorization, retries, locks, transactions, async execution, or workers.
+
+## CQRS Map v2
+
+All runtime locators consume one immutable `CqrsMap` snapshot. Its serialized shape is:
+
+```php
+[
+    'version' => 2,
+    'commands' => [
+        'handlers' => [
+            Command::class => ['service' => Handler::class, 'method' => '__invoke'],
+        ],
+        'listeners' => [
+            Command::class => [[
+                'service' => Listener::class,
+                'events' => [CommandProcessedEvent::class],
+                'priority' => 100,
+            ]],
+        ],
+        'known' => [Command::class => true],
+        'metadata' => [
+            Command::class => [
+                Attribute::class => ['arguments' => ['value']],
+            ],
+        ],
+    ],
+    'queries' => [
+        'handlers' => [
+            Query::class => ['service' => QueryHandler::class, 'method' => 'handle'],
+        ],
+    ],
+]
+```
+
+Empty sections are omitted, so an empty valid artifact is exactly `['version' => 2]`. Serialization is deterministic. Conflicting handlers or metadata fail instead of silently using the last entry; identical listeners are deduplicated and the global listener order is priority descending, then service and event names.
+
+`APP_ENV=production` requires a current v2 artifact. Other environments may start with an empty base map, and `componenta/cqrs-app` can overlay live discovery. Old map keys and unsupported artifact versions throw an exception that asks the operator to clear caches and run `app:build`.
 
 ## Commands
 
 A command is an object with data for a state-changing use case. `CommandBusInterface::dispatch(object $command, array $attributes = [])` returns an immutable `OperationInterface` with operation id, attributes, and a result when the command runs synchronously.
 
-Handlers are resolved through `CommandHandlerLocatorInterface`. A handler map entry can be a callable or a `[class-string, method-string]` pair. Class/method pairs are resolved lazily through the container.
+Handlers are resolved through `CommandHandlerLocatorInterface`. A map descriptor stores a service id and method; the service callable is resolved lazily through the container and memoized by the locator.
 
 `#[AsCommandHandler(?string $command = null)]` is discovery metadata for `componenta/cqrs-app`. If the command is omitted, `cqrs-app` infers it from the handler parameter.
 
@@ -140,9 +184,9 @@ Order is behavior. Keep cross-cutting concerns in middleware instead of hiding t
 |---|---|---|---|
 | `#[AsCommandHandler]` | class or method | `?string $command = null` | Discovery metadata for command handlers. |
 | `#[AsCommandListener]` | class | `string $command, int $priority = 0, array $eventTypes = []` | Discovery metadata for command event listeners. |
-| `#[Async]` | command class | `string $transport = 'default', int $delay = 0` | Metadata consumed by `componenta/cqrs-transport`. |
-| `#[Retry]` | command class | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Metadata consumed by `componenta/cqrs-retry`. |
-| `#[Lock]` | command class | `string $key, float $ttl = 300.0, bool $blocking = true` | Metadata consumed by `componenta/cqrs-lock`. |
+| `#[Componenta\CQRS\Transport\Attribute\Async]` | command class | `string $transport = 'default', int $delay = 0` | Metadata supplied by `componenta/cqrs-transport`. |
+| `#[Componenta\CQRS\Retry\Attribute\Retry]` | command class | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Metadata supplied by `componenta/cqrs-retry`. |
+| `#[Componenta\CQRS\Lock\Attribute\Lock]` | command class | `string $key, float $ttl = 300.0, bool $blocking = true` | Metadata supplied by `componenta/cqrs-lock`. |
 
 
 ## Command Events
@@ -178,7 +222,7 @@ Handlers are resolved through `QueryHandlerLocatorInterface`. `#[AsQueryHandler(
 | Command chain step | `Componenta\CQRS\Command\Middleware\MiddlewareInterface` | A custom step must run around command execution. |
 | Query chain step | `Componenta\CQRS\Query\Middleware\MiddlewareInterface` | A custom step must run around query execution. |
 | Command event listeners | `CommandListenerInterface` | A side effect should react to command events without changing the command handler. |
-| Command metadata | `CommandAttributeProviderInterface` | `#[Async]`, `#[Retry]`, and `#[Lock]` must come from a source other than reflection or the standard compiled map. |
+| Command metadata | `CommandMetadataProviderInterface` | Metadata must come from a source other than the versioned map and its reflection fallback. `get($command, Attribute::class)` is generic; optional packages register attribute classes through config. |
 
 ## Failures
 
@@ -188,3 +232,17 @@ Handlers are resolved through `QueryHandlerLocatorInterface`. `#[AsQueryHandler(
 | Invalid command handler | `Componenta\CQRS\Command\Exception\InvalidHandlerException` |
 | Missing query handler | `Componenta\CQRS\Query\Exception\HandlerNotFoundException` |
 
+
+## Migration From v1
+
+| v1 | v2 |
+|---|---|
+| `COMMAND_HANDLER_MAP` | `CQRS_MAP['commands']['handlers']` |
+| `QUERY_HANDLER_MAP` | `CQRS_MAP['queries']['handlers']` |
+| `COMMAND_LISTENER_MAP` | `CQRS_MAP['commands']['listeners']` |
+| `COMMAND_ATTRIBUTE_MAP` | `CQRS_MAP['commands']['metadata']` |
+| `COMPILED_MAPS` | Removed; map version and environment define the runtime path. |
+| `CommandAttributeProviderInterface` | `CommandMetadataProviderInterface` |
+| `async()/retry()/lock()` | `get($command, Attribute::class)` |
+
+After upgrading, remove config, discovery, old CQRS, generated resolver, and release-fingerprint caches, then run `APP_ENV=development php bin/console.php app:build`.

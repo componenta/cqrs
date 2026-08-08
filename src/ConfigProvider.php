@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Componenta\CQRS;
 
 use Componenta\CQRS\Command\CommandBusInterface;
-use Componenta\CQRS\Command\Metadata\CommandAttributeProviderInterface;
-use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
-use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
+use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
 use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
+use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\Factory\HandleQueryFactory;
 use Componenta\CQRS\Query\Factory\QueryBusFactory;
 use Componenta\CQRS\Query\Factory\QueryHandlerLocatorFactory;
@@ -24,31 +23,16 @@ class ConfigProvider extends \Componenta\Config\ConfigProvider
     protected function getFactories(): array
     {
         return [
+            CqrsMapProviderInterface::class => Map\Factory\ConfigCqrsMapProviderFactory::class,
             QueryBusInterface::class => QueryBusFactory::class,
             QueryHandlerLocatorInterface::class => QueryHandlerLocatorFactory::class,
             HandleQuery::class => HandleQueryFactory::class,
             CommandBusInterface::class => Command\Factory\CommandBusFactory::class,
-            CommandAttributeProviderInterface::class => Command\Factory\CommandAttributeProviderFactory::class,
-            CommandHandlerLocator::class => Command\Factory\CommandHandlerLocatorFactory::class,
+            CommandMetadataProviderInterface::class => Command\Factory\CommandMetadataProviderFactory::class,
+            CommandHandlerLocatorInterface::class => Command\Factory\CommandHandlerLocatorFactory::class,
             HandleCommandHandler::class => Command\Factory\HandleCommandHandlerFactory::class,
             EventMiddleware::class => Command\Factory\EventMiddlewareFactory::class,
-            CommandListenersLocator::class => Command\Factory\CommandListenerLocatorFactory::class,
-        ];
-    }
-
-    protected function getAliases(): array
-    {
-        return [
-            CommandHandlerLocatorInterface::class => CommandHandlerLocator::class,
-            CommandListenersLocatorInterface::class => CommandListenersLocator::class,
-        ];
-    }
-
-    protected function getConfig(): array
-    {
-        return [
-            ConfigKey::COMMAND_MIDDLEWARES => [],
-            ConfigKey::QUERY_MIDDLEWARES => [],
+            CommandListenersLocatorInterface::class => Command\Factory\CommandListenerLocatorFactory::class,
         ];
     }
 }

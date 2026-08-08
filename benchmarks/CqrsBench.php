@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Benchmarks;
 
+use Attribute;
+use Componenta\Config\Config;
 use Componenta\CQRS\Command\CommandBus;
-use Componenta\CQRS\Command\Attribute\Async;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
-use Componenta\CQRS\Command\Metadata\CommandAttributeProviderInterface;
-use Componenta\CQRS\Command\Metadata\CompiledCommandAttributeProvider;
-use Componenta\CQRS\Command\Metadata\ReflectionCommandAttributeProvider;
+use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
+use Componenta\CQRS\Command\Metadata\CompiledCommandMetadataProvider;
+use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface as CommandMiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationInterface;
-use Componenta\CQRS\App\Compile\CommandAttributeMapCompiler;
+use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\ConfigCqrsMapProvider;
 use Componenta\CQRS\Query\Context\ContextInterface;
 use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
@@ -37,8 +39,8 @@ final class CqrsBench
     private QueryBus $queryBusWithoutMiddleware;
     private QueryBus $queryBusWithTwoMiddlewares;
     private QueryBus $queryBusWithEightMiddlewares;
-    private CommandAttributeProviderInterface $reflectionCommandAttributes;
-    private CommandAttributeProviderInterface $compiledCommandAttributes;
+    private CommandMetadataProviderInterface $reflectionCommandMetadata;
+    private CommandMetadataProviderInterface $compiledCommandMetadata;
     private BenchmarkCommand $command;
     private BenchmarkQuery $query;
 
@@ -83,13 +85,29 @@ final class CqrsBench
             new BenchmarkQueryMiddleware(),
         );
 
-        $this->reflectionCommandAttributes = new ReflectionCommandAttributeProvider();
-        $this->compiledCommandAttributes = new CompiledCommandAttributeProvider(
-            (new CommandAttributeMapCompiler())->compile(
-                [BenchmarkAttributedCommand::class],
-                [BenchmarkAttributedCommand::class],
-            ),
-            $this->reflectionCommandAttributes,
+        $this->reflectionCommandMetadata = new ReflectionCommandMetadataProvider();
+        $this->compiledCommandMetadata = new CompiledCommandMetadataProvider(
+            new ConfigCqrsMapProvider(new Config([
+                ConfigKey::CQRS_MAP => [
+                    'version' => 2,
+                    'commands' => [
+                        'known' => [
+                            BenchmarkAttributedCommand::class => true,
+                        ],
+                        'metadata' => [
+                            BenchmarkAttributedCommand::class => [
+                                BenchmarkMetadata::class => [
+                                    'arguments' => [
+                                        'transport' => 'bench',
+                                        'delay' => 3,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ])),
+            $this->reflectionCommandMetadata,
         );
 
         $this->command = new BenchmarkCommand('payload');
@@ -139,17 +157,23 @@ final class CqrsBench
     }
 
     #[Revs(10000)]
-    #[Groups(['cqrs', 'command', 'attributes', 'reflection'])]
-    public function benchReflectionCommandAttributeLookup(): void
+    #[Groups(['cqrs', 'command', 'metadata', 'reflection'])]
+    public function benchReflectionCommandMetadataLookup(): void
     {
-        $this->reflectionCommandAttributes->async(BenchmarkAttributedCommand::class);
+        $this->reflectionCommandMetadata->get(
+            BenchmarkAttributedCommand::class,
+            BenchmarkMetadata::class,
+        );
     }
 
     #[Revs(10000)]
-    #[Groups(['cqrs', 'command', 'attributes', 'compiled'])]
-    public function benchCompiledCommandAttributeLookup(): void
+    #[Groups(['cqrs', 'command', 'metadata', 'compiled'])]
+    public function benchCompiledCommandMetadataLookup(): void
     {
-        $this->compiledCommandAttributes->async(BenchmarkAttributedCommand::class);
+        $this->compiledCommandMetadata->get(
+            BenchmarkAttributedCommand::class,
+            BenchmarkMetadata::class,
+        );
     }
 }
 
@@ -160,7 +184,16 @@ final readonly class BenchmarkCommand
     ) {}
 }
 
-#[Async(transport: 'bench', delay: 3)]
+#[Attribute(Attribute::TARGET_CLASS)]
+final readonly class BenchmarkMetadata
+{
+    public function __construct(
+        public string $transport,
+        public int $delay = 0,
+    ) {}
+}
+
+#[BenchmarkMetadata(transport: 'bench', delay: 3)]
 final readonly class BenchmarkAttributedCommand
 {
     public function __construct(

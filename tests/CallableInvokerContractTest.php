@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use Componenta\Config\Config;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Map\ConfigCqrsMapProvider;
+use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\DI\CallableInvokerInterface;
@@ -54,13 +58,31 @@ final class CallableInvokerContractSpy implements CallableInvokerInterface
     }
 }
 
+function callableInvokerContractMapProvider(string $section): CqrsMapProviderInterface
+{
+    return new ConfigCqrsMapProvider(new Config([
+        ConfigKey::CQRS_MAP => [
+            'version' => 2,
+            $section => [
+                'handlers' => [
+                    CallableInvokerContractMessage::class => [
+                        'service' => CallableInvokerContractHandler::class,
+                        'method' => 'handle',
+                    ],
+                ],
+            ],
+        ],
+    ]));
+}
+
 it('dispatches a compiled query handler through the configured callable invoker', function (): void {
     $message = new CallableInvokerContractMessage('query');
     $handler = new CallableInvokerContractHandler();
     $invoker = new CallableInvokerContractSpy();
+    $container = new CallableInvokerContractContainer($handler);
     $locator = new QueryHandlerLocator(
-        [CallableInvokerContractMessage::class => [CallableInvokerContractHandler::class, 'handle', true]],
-        container: new CallableInvokerContractContainer($handler),
+        callableInvokerContractMapProvider('queries'),
+        $container,
     );
 
     $result = (new HandleQuery($locator, $invoker))($message);
@@ -74,9 +96,10 @@ it('dispatches a compiled command handler through the configured callable invoke
     $message = new CallableInvokerContractMessage('command');
     $handler = new CallableInvokerContractHandler();
     $invoker = new CallableInvokerContractSpy();
+    $container = new CallableInvokerContractContainer($handler);
     $locator = new CommandHandlerLocator(
-        [CallableInvokerContractMessage::class => [CallableInvokerContractHandler::class, 'handle', true]],
-        container: new CallableInvokerContractContainer($handler),
+        callableInvokerContractMapProvider('commands'),
+        $container,
     );
 
     $operation = (new HandleCommandHandler($locator, $invoker))->handle(Operation::create($message));
