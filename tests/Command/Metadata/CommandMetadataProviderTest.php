@@ -82,7 +82,7 @@ function compiledCommandMetadataMapProviderForTests(): CqrsMapProviderInterface
 }
 
 describe('Command metadata provider', function (): void {
-    it('hydrates generic attributes from compiled descriptors and caches them', function (): void {
+    it('hydrates a fresh generic attribute from each compiled descriptor lookup', function (): void {
         $provider = new CompiledCommandMetadataProvider(
             compiledCommandMetadataMapProviderForTests(),
         );
@@ -98,7 +98,7 @@ describe('Command metadata provider', function (): void {
             ->and($provider->get(
                 CqrsCompiledAnnotatedCommand::class,
                 CqrsCompiledMetadata::class,
-            ))->toBe($metadata)
+            ))->not->toBe($metadata)
             ->and($provider->isKnown(CqrsCompiledAnnotatedCommand::class))->toBeTrue();
     });
 

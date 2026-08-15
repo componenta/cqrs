@@ -13,6 +13,8 @@ use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationInterface;
+use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\Command\OperationResult;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Map\ConfigCqrsMapProvider;
@@ -50,6 +52,23 @@ it('dispatches a command without middleware and returns operation result', funct
     $operation = $bus->dispatch(makeCommandBusCommand('plain'));
 
     expect($operation->result?->value)->toBe('handled:plain');
+});
+
+it('uses a supplied operation factory before entering the middleware pipeline', function () {
+    $factory = new readonly class implements OperationFactoryInterface {
+        public function create(object $command, array $attributes = []): OperationInterface
+        {
+            return Operation::create($command, [...$attributes, 'factory' => 'custom']);
+        }
+    };
+    $bus = new CommandBus(makeCommandBusTerminal(), $factory);
+
+    $operation = $bus->dispatch(makeCommandBusCommand('factory'), ['trace_id' => 'trace-2']);
+
+    expect($operation->attributes)->toBe([
+        'trace_id' => 'trace-2',
+        'factory' => 'custom',
+    ]);
 });
 
 it('preserves dispatch attributes and result through the command pipeline', function () {

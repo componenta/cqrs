@@ -17,7 +17,10 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
 
     public function supports(object $command): bool
     {
-        return array_any($this->resolvers, static fn($resolver) => $resolver->supports($command));
+        return array_any(
+            $this->resolvers,
+            static fn(CommandNameResolverInterface $resolver): bool => $resolver->supports($command),
+        ) || $this->fallback->supports($command);
     }
 
     public function resolve(object $command): string

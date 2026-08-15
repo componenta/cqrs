@@ -92,7 +92,7 @@ interface OperationInterface
     /**
      * Arbitrary attributes.
      *
-     * @return array<string, mixed>
+     * @var array<string, mixed>
      */
     public array $attributes { get; }
 

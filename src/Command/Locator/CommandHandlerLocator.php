@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Command\Locator;
 
 use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
+use Componenta\CQRS\Command\Exception\InvalidHandlerException;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use LogicException;
 use Psr\Container\ContainerInterface;
 
 final class CommandHandlerLocator implements CommandHandlerLocatorInterface, CommandSupportAwareInterface
@@ -31,6 +31,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
      * @return callable(T): mixed
      *
      * @throws HandlerNotFoundException
+     * @throws InvalidHandlerException
      */
     public function locateFor(object $command): callable
     {
@@ -50,22 +51,20 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
 
         if ($descriptor->method === '__invoke') {
             if (!is_callable($handler)) {
-                throw new LogicException(sprintf(
-                    'CQRS command handler service "%s" for "%s" is not invokable.',
+                throw InvalidHandlerException::serviceNotInvokable(
                     $descriptor->service,
                     $commandName,
-                ));
+                );
             }
 
             return $this->resolvedHandlers[$commandName] = $handler;
         }
 
         if (!is_callable([$handler, $descriptor->method])) {
-            throw new LogicException(sprintf(
-                'CQRS command handler service "%s" has no public callable method "%s".',
+            throw InvalidHandlerException::serviceMethodNotCallable(
                 $descriptor->service,
                 $descriptor->method,
-            ));
+            );
         }
 
         return $this->resolvedHandlers[$commandName] = $handler->{$descriptor->method}(...);

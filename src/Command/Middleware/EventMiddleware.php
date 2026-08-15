@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Middleware;
 
-use Componenta\CQRS\Command\Event\CommandEvent;
+use Componenta\CQRS\Command\Exception\CommandFailureNotificationException;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
@@ -47,17 +47,21 @@ final readonly class EventMiddleware implements MiddlewareInterface
      */
     public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
     {
+        $this->dispatch(new CommandProcessEvent($operation));
+
         try {
-            $this->dispatch(new CommandProcessEvent($operation));
-
             $operation = $handler->handle($operation);
-
-            $this->dispatch(new CommandProcessedEvent($operation));
         } catch (Throwable $exception) {
-            $this->dispatch(new CommandFailedEvent($operation, $exception));
+            try {
+                $this->dispatch(new CommandFailedEvent($operation, $exception));
+            } catch (Throwable $notificationFailure) {
+                throw new CommandFailureNotificationException($exception, $notificationFailure);
+            }
 
             throw $exception;
         }
+
+        $this->dispatch(new CommandProcessedEvent($operation));
 
         return $operation;
     }
@@ -65,7 +69,9 @@ final readonly class EventMiddleware implements MiddlewareInterface
     /**
      * @throws Throwable
      */
-    private function dispatch(CommandEvent $event): void
+    private function dispatch(
+        CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
+    ): void
     {
         try {
             foreach ($this->locator->locateFor($event) as $listener) {

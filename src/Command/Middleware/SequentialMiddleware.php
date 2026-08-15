@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Command\Middleware;
 
 use Componenta\CQRS\Command\OperationInterface;
+use Fiber;
 use LogicException;
 use SplQueue;
+use WeakMap;
 
 /**
  * Ensures commands execute sequentially within a single process.
@@ -50,38 +52,47 @@ use SplQueue;
  */
 final class SequentialMiddleware implements MiddlewareInterface
 {
-    private bool $executing = false;
+    private SequentialExecutionState $mainState;
 
-    /** @var SplQueue<array{OperationInterface, OperationHandlerInterface}> */
-    private SplQueue $queue;
+    /** @var WeakMap<object, SequentialExecutionState> */
+    private WeakMap $fiberStates;
 
     public function __construct()
     {
-        $this->queue = new SplQueue();
+        $this->mainState = new SequentialExecutionState();
+        $this->fiberStates = new WeakMap();
     }
 
     public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
     {
-        $this->queue->enqueue([$operation, $handler]);
+        $fiber = Fiber::getCurrent();
+        $state = $fiber === null
+            ? $this->mainState
+            : ($this->fiberStates[$fiber] ??= new SequentialExecutionState());
+        $state->queue->enqueue([$operation, $handler]);
 
-        if ($this->executing) {
+        if ($state->executing) {
             return $operation;
         }
 
-        $this->executing = true;
+        $state->executing = true;
         $rootOperation = null;
 
         try {
-            while (!$this->queue->isEmpty()) {
+            while (!$state->queue->isEmpty()) {
                 /** @var array{OperationInterface, OperationHandlerInterface} $item */
-                $item = $this->queue->dequeue();
+                $item = $state->queue->dequeue();
                 $result = $item[1]->handle($item[0]);
 
                 $rootOperation ??= $result;
             }
         } finally {
-            $this->executing = false;
-            $this->queue = new SplQueue();
+            $state->executing = false;
+            $state->queue = new SplQueue();
+
+            if ($fiber !== null) {
+                unset($this->fiberStates[$fiber]);
+            }
         }
 
         if ($rootOperation === null) {
@@ -89,5 +100,19 @@ final class SequentialMiddleware implements MiddlewareInterface
         }
 
         return $rootOperation;
+    }
+}
+
+/** @internal */
+final class SequentialExecutionState
+{
+    public bool $executing = false;
+
+    /** @var SplQueue<array{OperationInterface, OperationHandlerInterface}> */
+    public SplQueue $queue;
+
+    public function __construct()
+    {
+        $this->queue = new SplQueue();
     }
 }

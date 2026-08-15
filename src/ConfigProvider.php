@@ -10,6 +10,8 @@ use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
 use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
+use Componenta\CQRS\Command\OperationFactory;
+use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\Factory\HandleQueryFactory;
 use Componenta\CQRS\Query\Factory\QueryBusFactory;
@@ -20,6 +22,13 @@ use Componenta\CQRS\Query\QueryBusInterface;
 
 class ConfigProvider extends \Componenta\Config\ConfigProvider
 {
+    protected function getInvokables(): array
+    {
+        return [
+            OperationFactoryInterface::class => OperationFactory::class,
+        ];
+    }
+
     protected function getFactories(): array
     {
         return [

@@ -9,17 +9,19 @@ use DateTimeZone;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 
-final  readonly class Operation implements OperationInterface
+final readonly class Operation implements OperationInterface
 {
+    /** @param array<string, mixed> $attributes */
     public function __construct(
         public UuidInterface $id,
         public object $command,
         public DateTimeImmutable $startedAt,
         private(set) array $attributes = [],
-        public ?OperationResult  $result = null,
-    ) {}
+        public ?OperationResult $result = null,
+    ) {
+    }
 
-
+    /** @param array<string, mixed> $attributes */
     public static function create(object $command, array $attributes = []): self
     {
         return new self(

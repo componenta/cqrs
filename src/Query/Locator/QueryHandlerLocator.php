@@ -37,7 +37,7 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
         $descriptor = $this->mapProvider->map()->queryHandler($queryName);
 
         if ($descriptor === null) {
-            throw new HandlerNotFoundException($query);
+            throw new HandlerNotFoundException($query, queryName: $queryName);
         }
 
         $handler = $this->container->get($descriptor->service);

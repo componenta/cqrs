@@ -7,8 +7,8 @@ namespace Componenta\CQRS\Command;
 /**
  * Factory interface for creating operation instances.
  *
- * This contract is useful when code creates operations explicitly. The current
- * CommandBus creates operations directly through Operation::create().
+ * CommandBus uses this contract to create the operation passed through its
+ * middleware pipeline.
  *
  * @example
  * ```php
@@ -22,7 +22,7 @@ namespace Componenta\CQRS\Command;
  *     public function create(object $command, array $attributes = []): OperationInterface
  *     {
  *         $operation = Operation::create($command, $attributes);
- *         $_SERVER['HTTP_X_TRACE_ID'] = (string)$operation->uuid;
+ *         $_SERVER['HTTP_X_TRACE_ID'] = $operation->id->toString();
  *         return $operation;
  *     }
  * }
@@ -53,6 +53,7 @@ interface OperationFactoryInterface
     /**
      * Creates a new operation instance.
      *
+     * @param array<string, mixed> $attributes
      * @return OperationInterface New operation ready for use
      */
     public function create(object $command, array $attributes = []): OperationInterface;

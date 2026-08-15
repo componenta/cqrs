@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Command;
 
 /**
- * Default operation factory implementation for code that creates operations explicitly.
+ * Default operation factory used by CommandBus.
  *
  * @example
  * ```php
@@ -19,7 +19,7 @@ final readonly class OperationFactory implements OperationFactoryInterface
      * Creates a new operation with UUID v7 and current timestamp.
      *
      * @param object $command
-     * @param array $attributes
+     * @param array<string, mixed> $attributes
      * @return OperationInterface New operation instance
      */
     public function create(object $command, array $attributes = []): OperationInterface

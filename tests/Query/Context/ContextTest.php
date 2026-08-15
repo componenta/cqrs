@@ -32,6 +32,13 @@ it('withAttribute returns a new instance with the value set, leaving the origina
         ->and($next->attributes)->toBe(['a' => 1, 'b' => 2]);
 });
 
+it('returns a stored null instead of substituting the fallback', function () {
+    $ctx = new Context(['nullable' => null]);
+
+    expect($ctx->hasAttribute('nullable'))->toBeTrue()
+        ->and($ctx->getAttribute('nullable', 'fallback'))->toBeNull();
+});
+
 it('withAttribute overrides an existing key', function () {
     $ctx = (new Context(['a' => 1]))->withAttribute('a', 99);
 

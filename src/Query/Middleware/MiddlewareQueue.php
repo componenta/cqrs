@@ -9,15 +9,13 @@ use Componenta\Stdlib\ArrayListReverseIterator;
 
 final class MiddlewareQueue implements MiddlewareInterface
 {
-    /**
-     * @var ArrayListReverseIterator<int, MiddlewareInterface>
-     */
-    private ArrayListReverseIterator $queue;
+    /** @var ArrayListReverseIterator<MiddlewareInterface> */
+    private readonly ArrayListReverseIterator $queue;
 
     public function __construct(
         MiddlewareInterface ...$middlewares
     ) {
-        $this->queue = new ArrayListReverseIterator($middlewares);
+        $this->queue = new ArrayListReverseIterator(array_values($middlewares));
     }
 
     /**
@@ -26,17 +24,16 @@ final class MiddlewareQueue implements MiddlewareInterface
     public function handle(object $query, ContextInterface $context, callable $next): mixed
     {
         foreach ($this->queue as $middleware) {
-            $next = static fn(object $q, ContextInterface $c) => $middleware->handle($q, $c, $next);
+            $next = static fn(object $q, ContextInterface $c): mixed
+                => $middleware->handle($q, $c, $next);
         }
 
         return $next($query, $context);
     }
 
+    /** @param list<MiddlewareInterface> $middlewares */
     public static function from(array $middlewares): self
     {
-        $self = new self();
-        $self->queue = new ArrayListReverseIterator($middlewares);
-
-        return $self;
+        return new self(...$middlewares);
     }
 }

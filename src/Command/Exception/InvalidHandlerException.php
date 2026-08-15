@@ -25,4 +25,22 @@ final class InvalidHandlerException extends LogicException implements LocatorExc
     {
         return new self("Handler '$handler' first parameter must be typed with command class");
     }
+
+    public static function serviceNotInvokable(string $service, string $command): self
+    {
+        return new self(sprintf(
+            'CQRS command handler service "%s" for "%s" is not invokable.',
+            $service,
+            $command,
+        ));
+    }
+
+    public static function serviceMethodNotCallable(string $service, string $method): self
+    {
+        return new self(sprintf(
+            'CQRS command handler service "%s" has no public callable method "%s".',
+            $service,
+            $method,
+        ));
+    }
 }

@@ -9,17 +9,14 @@ use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 
 trait CommandNameResolution
 {
-    private array $resolvedNames = [];
-
     private ?CommandNameResolverInterface $resolver = null;
 
     private function resolveCommandName(object $command): string
     {
-        if (isset($this->resolvedNames[$command::class])) {
-            return $this->resolvedNames[$command::class];
+        if ($this->resolver !== null && $this->resolver->supports($command)) {
+            return $this->resolver->resolve($command);
         }
 
-        return $this->resolvedNames[$command::class] = $this->resolver?->resolve($command)
-            ?? ($command instanceof NamedCommandInterface ? $command->commandName : $command::class);
+        return $command instanceof NamedCommandInterface ? $command->commandName : $command::class;
     }
 }

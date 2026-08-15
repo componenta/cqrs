@@ -12,9 +12,6 @@ use Throwable;
 
 final class CompiledCommandMetadataProvider implements CommandMetadataProviderInterface
 {
-    /** @var array<string, array<class-string, object|null>> */
-    private array $resolved = [];
-
     public function __construct(
         private readonly CqrsMapProviderInterface $mapProvider,
         private readonly CommandMetadataProviderInterface $fallback
@@ -31,36 +28,21 @@ final class CompiledCommandMetadataProvider implements CommandMetadataProviderIn
     public function get(object|string $command, string $attribute): ?object
     {
         $command = self::className($command);
-
-        if (array_key_exists($attribute, $this->resolved[$command] ?? [])) {
-            $metadata = $this->resolved[$command][$attribute];
-
-            if ($metadata !== null && !$metadata instanceof $attribute) {
-                throw new InvalidCqrsMapException(sprintf(
-                    'Cached command metadata for "%s" is not a %s instance.',
-                    $command,
-                    $attribute,
-                ));
-            }
-
-            return $metadata;
-        }
-
         $map = $this->mapProvider->map();
         $descriptor = $map->commandMetadata($command, $attribute);
 
         if ($descriptor !== null) {
-            return $this->resolved[$command][$attribute] = self::materialize(
+            return self::materialize(
                 $attribute,
                 $descriptor->arguments,
             );
         }
 
         if ($map->isKnownCommand($command)) {
-            return $this->resolved[$command][$attribute] = null;
+            return null;
         }
 
-        return $this->resolved[$command][$attribute] = $this->fallback->get(
+        return $this->fallback->get(
             $command,
             $attribute,
         );
@@ -105,10 +87,18 @@ final class CompiledCommandMetadataProvider implements CommandMetadataProviderIn
         }
 
         $reflection = new ReflectionClass($attribute);
+        $declarations = $reflection->getAttributes(Attribute::class);
 
-        if ($reflection->getAttributes(Attribute::class) === []) {
+        if ($declarations === []) {
             throw new InvalidCqrsMapException(sprintf(
                 'Command metadata class "%s" is not declared with #[Attribute].',
+                $attribute,
+            ));
+        }
+
+        if (($declarations[0]->newInstance()->flags & Attribute::TARGET_CLASS) === 0) {
+            throw new InvalidCqrsMapException(sprintf(
+                'Command metadata attribute "%s" must allow class targets.',
                 $attribute,
             ));
         }

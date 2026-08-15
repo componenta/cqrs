@@ -13,7 +13,7 @@
     "require": {
         "php": ">=8.4",
         "componenta/arrayable": "^1.0",
-        "componenta/config": "^2.0",
+        "componenta/config": "^2.0.1",
         "componenta/di": "^4.0",
         "componenta/iterator": "^1.0",
         "componenta/reflection": "^2.0",

@@ -6,6 +6,7 @@ use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
+use Componenta\CQRS\Command\Exception\InvalidHandlerException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Operation;
@@ -92,6 +93,24 @@ it('resolves a handler service and binds its callable only once', function (): v
     expect($first)->toBe($second)
         ->and($first($command))->toBe($command)
         ->and($container->gets)->toBe([RuntimeLocatorTestHandler::class => 1]);
+});
+
+it('reports invalid mapped handler services with the documented locator exception', function (): void {
+    foreach ([
+        ['__invoke', 'is not invokable'],
+        ['missingMethod', 'has no public callable method'],
+    ] as [$method, $message]) {
+        $map = new CqrsMap(commandHandlers: [
+            RuntimeLocatorTestCommand::class => new HandlerDescriptor('invalid.handler', $method),
+        ]);
+        $locator = new CommandHandlerLocator(
+            new RuntimeLocatorTestMapProvider($map),
+            new RuntimeLocatorTestContainer(['invalid.handler' => new stdClass()]),
+        );
+
+        expect(fn() => $locator->locateFor(new RuntimeLocatorTestCommand()))
+            ->toThrow(InvalidHandlerException::class, $message);
+    }
 });
 
 it('filters listener events before container access and memoizes instances by service id', function (): void {

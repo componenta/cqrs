@@ -9,6 +9,8 @@ use Componenta\CQRS\Command\Factory\CommandMetadataProviderFactory;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
+use Componenta\CQRS\Command\OperationFactory;
+use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\ConfigProvider;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
@@ -16,7 +18,7 @@ use Componenta\CQRS\Map\Factory\ConfigCqrsMapProviderFactory;
 use Componenta\CQRS\Query\Factory\QueryHandlerLocatorFactory;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
 
-it('registers map-backed CQRS runtime services without aliases or empty defaults', function (): void {
+it('registers map-backed CQRS runtime services and the default operation factory', function (): void {
     $config = (new ConfigProvider())();
 
     expect($config)->not->toHaveKey(ConfigKey::COMMAND_MIDDLEWARES)
@@ -29,8 +31,12 @@ it('registers map-backed CQRS runtime services without aliases or empty defaults
             CommandListenersLocatorInterface::class => CommandListenerLocatorFactory::class,
             CommandMetadataProviderInterface::class => CommandMetadataProviderFactory::class,
         ])
+        ->and($config[DependencyConfigKey::DEPENDENCIES][DependencyConfigKey::INVOKABLES] ?? [])
+        ->toBe([OperationFactory::class])
         ->and($config[DependencyConfigKey::DEPENDENCIES][DependencyConfigKey::ALIASES] ?? [])
-        ->toBe([])
+        ->toBe([
+            OperationFactoryInterface::class => OperationFactory::class,
+        ])
         ->and(defined(ConfigKey::class . '::COMMAND_HANDLER_MAP'))->toBeFalse()
         ->and(defined(ConfigKey::class . '::QUERY_HANDLER_MAP'))->toBeFalse()
         ->and(defined(ConfigKey::class . '::COMMAND_LISTENER_MAP'))->toBeFalse()

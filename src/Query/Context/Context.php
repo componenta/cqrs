@@ -17,7 +17,9 @@ final readonly class Context implements ContextInterface
 
     public function getAttribute(string $name, mixed $default = null): mixed
     {
-        return $this->attributes[$name] ?? $default;
+        return array_key_exists($name, $this->attributes)
+            ? $this->attributes[$name]
+            : $default;
     }
 
     public function hasAttribute(string $name): bool
