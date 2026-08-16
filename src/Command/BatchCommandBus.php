@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command;
 use InvalidArgumentException;
 
 /**
- * Command bus decorator that can dispatch multiple command classes in sequence.
+ * Command bus decorator that can dispatch multiple commands in sequence.
  */
 final readonly class BatchCommandBus implements CommandBusInterface
 {
@@ -24,12 +24,9 @@ final readonly class BatchCommandBus implements CommandBusInterface
     /**
      * Dispatches commands sequentially with attributes resolved by command class.
      *
-     * Each command class may occur only once in a batch because both attributes
-     * and returned operations are keyed by command class.
-     *
      * @param iterable<object> $commands
      * @param array<class-string, array<string, mixed>> $attributes
-     * @return array<class-string, OperationInterface>
+     * @return list<OperationInterface>
      */
     public function dispatchMany(iterable $commands, array $attributes = []): array
     {
@@ -44,14 +41,6 @@ final readonly class BatchCommandBus implements CommandBusInterface
             }
 
             $commandClass = $command::class;
-
-            if (array_key_exists($commandClass, $batch)) {
-                throw new InvalidArgumentException(sprintf(
-                    'Command class "%s" may occur only once in a batch.',
-                    $commandClass,
-                ));
-            }
-
             $commandAttributes = $attributes[$commandClass] ?? [];
 
             if (!is_array($commandAttributes)) {
@@ -62,13 +51,13 @@ final readonly class BatchCommandBus implements CommandBusInterface
                 ));
             }
 
-            $batch[$commandClass] = [$command, $commandAttributes];
+            $batch[] = [$command, $commandAttributes];
         }
 
         $operations = [];
 
-        foreach ($batch as $commandClass => [$command, $commandAttributes]) {
-            $operations[$commandClass] = $this->bus->dispatch($command, $commandAttributes);
+        foreach ($batch as [$command, $commandAttributes]) {
+            $operations[] = $this->bus->dispatch($command, $commandAttributes);
         }
 
         return $operations;

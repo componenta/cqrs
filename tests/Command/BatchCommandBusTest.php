@@ -48,7 +48,7 @@ it('proxies single command dispatch unchanged', function () {
         ->and($inner->operations)->toBe([$operation]);
 });
 
-it('dispatches many commands with attributes keyed by command class', function () {
+it('dispatches many commands and returns operations as a list', function () {
     $inner = new RecordingBatchCommandBus();
     $bus = new BatchCommandBus($inner);
     $first = new BatchCommandBusFirstCommand('one');
@@ -71,22 +71,29 @@ it('dispatches many commands with attributes keyed by command class', function (
         ->and($inner->operations[1]->command)->toBe($second)
         ->and($inner->operations[1]->attributes)->toBe(['trace_id' => 'trace-2'])
         ->and($operations)->toBe([
-            BatchCommandBusFirstCommand::class => $inner->operations[0],
-            BatchCommandBusSecondCommand::class => $inner->operations[1],
+            $inner->operations[0],
+            $inner->operations[1],
         ]);
 });
 
-it('rejects duplicate command classes before dispatching the batch', function () {
+it('allows duplicate command classes and applies class attributes to each command', function () {
     $inner = new RecordingBatchCommandBus();
     $bus = new BatchCommandBus($inner);
+    $first = new BatchCommandBusDuplicateCommand('one');
+    $second = new BatchCommandBusDuplicateCommand('two');
 
-    expect(fn () => $bus->dispatchMany([
-        new BatchCommandBusDuplicateCommand('one'),
-        new BatchCommandBusDuplicateCommand('two'),
-    ]))->toThrow(
-        InvalidArgumentException::class,
-        'Command class "' . BatchCommandBusDuplicateCommand::class . '" may occur only once in a batch.',
+    $operations = $bus->dispatchMany(
+        [$first, $second],
+        [BatchCommandBusDuplicateCommand::class => ['trace_id' => 'trace-duplicate']],
     );
 
-    expect($inner->operations)->toBe([]);
+    expect($inner->operations)->toHaveCount(2)
+        ->and($inner->operations[0]->command)->toBe($first)
+        ->and($inner->operations[1]->command)->toBe($second)
+        ->and($inner->operations[0]->attributes)->toBe(['trace_id' => 'trace-duplicate'])
+        ->and($inner->operations[1]->attributes)->toBe(['trace_id' => 'trace-duplicate'])
+        ->and($operations)->toBe([
+            $inner->operations[0],
+            $inner->operations[1],
+        ]);
 });
