@@ -54,7 +54,7 @@ it('dispatches many commands with attributes keyed by command class', function (
     $first = new BatchCommandBusFirstCommand('one');
     $second = new BatchCommandBusSecondCommand('two');
 
-    $operationIds = $bus->dispatchMany(
+    $operations = $bus->dispatchMany(
         (static function () use ($first, $second): Generator {
             yield $first;
             yield $second;
@@ -70,9 +70,9 @@ it('dispatches many commands with attributes keyed by command class', function (
         ->and($inner->operations[0]->attributes)->toBe(['trace_id' => 'trace-1'])
         ->and($inner->operations[1]->command)->toBe($second)
         ->and($inner->operations[1]->attributes)->toBe(['trace_id' => 'trace-2'])
-        ->and($operationIds)->toBe([
-            BatchCommandBusFirstCommand::class => $inner->operations[0]->id,
-            BatchCommandBusSecondCommand::class => $inner->operations[1]->id,
+        ->and($operations)->toBe([
+            BatchCommandBusFirstCommand::class => $inner->operations[0],
+            BatchCommandBusSecondCommand::class => $inner->operations[1],
         ]);
 });
 
