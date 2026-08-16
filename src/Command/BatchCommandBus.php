@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Command;
 
 use InvalidArgumentException;
-use Ramsey\Uuid\UuidInterface;
 
 /**
  * Command bus decorator that can dispatch multiple command classes in sequence.
@@ -26,11 +25,11 @@ final readonly class BatchCommandBus implements CommandBusInterface
      * Dispatches commands sequentially with attributes resolved by command class.
      *
      * Each command class may occur only once in a batch because both attributes
-     * and returned operation IDs are keyed by command class.
+     * and returned operations are keyed by command class.
      *
      * @param iterable<object> $commands
      * @param array<class-string, array<string, mixed>> $attributes
-     * @return array<class-string, UuidInterface>
+     * @return array<class-string, OperationInterface>
      */
     public function dispatchMany(iterable $commands, array $attributes = []): array
     {
@@ -66,12 +65,12 @@ final readonly class BatchCommandBus implements CommandBusInterface
             $batch[$commandClass] = [$command, $commandAttributes];
         }
 
-        $operationIds = [];
+        $operations = [];
 
         foreach ($batch as $commandClass => [$command, $commandAttributes]) {
-            $operationIds[$commandClass] = $this->bus->dispatch($command, $commandAttributes)->id;
+            $operations[$commandClass] = $this->bus->dispatch($command, $commandAttributes);
         }
 
-        return $operationIds;
+        return $operations;
     }
 }
