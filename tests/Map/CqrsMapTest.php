@@ -190,18 +190,18 @@ describe('ConfigCqrsMapProvider', function (): void {
             ->and($provider->map())->toBe($map);
     });
 
-    it('allows a missing artifact outside production and requires it in production', function (): void {
+    it('allows a missing artifact only in development and requires it outside development', function (): void {
         $development = new ConfigCqrsMapProvider(new Config(
+            [],
+            new Environment(['APP_ENV' => 'development']),
+        ));
+        $staging = new ConfigCqrsMapProvider(new Config(
             [],
             new Environment(['APP_ENV' => 'staging']),
         ));
-        $production = new ConfigCqrsMapProvider(new Config(
-            [],
-            new Environment(['APP_ENV' => 'production']),
-        ));
 
         expect($development->map()->toArray())->toBe(['version' => CqrsMap::VERSION])
-            ->and(fn(): CqrsMap => $production->map())
+            ->and(fn(): CqrsMap => $staging->map())
             ->toThrow(MissingCqrsMapException::class, 'app:build');
     });
 
