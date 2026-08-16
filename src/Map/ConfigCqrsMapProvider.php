@@ -31,8 +31,11 @@ final class ConfigCqrsMapProvider implements CqrsMapProviderInterface
         }
 
         if (!$this->config->has(ConfigKey::CQRS_MAP)) {
-            if ($this->config->environment?->string('APP_ENV', 'development') === 'production') {
-                throw MissingCqrsMapException::forProduction();
+            $environment = $this->config->environment?->string('APP_ENV', 'development')
+                ?? 'development';
+
+            if ($environment !== 'development') {
+                throw MissingCqrsMapException::forEnvironment($environment);
             }
 
             return $this->map = CqrsMap::empty();

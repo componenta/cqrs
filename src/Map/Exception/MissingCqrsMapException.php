@@ -8,10 +8,16 @@ use RuntimeException;
 
 final class MissingCqrsMapException extends RuntimeException
 {
+    public static function forEnvironment(string $environment): self
+    {
+        return new self(sprintf(
+            'The compiled CQRS map is missing in "%s" environment. Clear stale caches and run app:build.',
+            $environment,
+        ));
+    }
+
     public static function forProduction(): self
     {
-        return new self(
-            'The compiled CQRS map is missing in production. Clear stale caches and run app:build.',
-        );
+        return self::forEnvironment('production');
     }
 }
