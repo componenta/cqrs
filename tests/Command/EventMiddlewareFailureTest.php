@@ -105,3 +105,51 @@ it('preserves the handler failure when command-failed notification also fails', 
             ->and($exception->getPrevious())->toBe($primary);
     }
 });
+
+it('suppresses only listener-body failures when explicitly requested', function (): void {
+    $listener = new EventPhaseTestListener(
+        static fn(): never => throw new RuntimeException('listener failed'),
+    );
+    $middleware = new EventMiddleware(
+        new EventPhaseTestLocator($listener),
+        suppressExceptions: true,
+    );
+    $handler = new class implements OperationHandlerInterface {
+        public function handle(OperationInterface $operation): OperationInterface
+        {
+            return $operation->withResult(new OperationResult('done'));
+        }
+    };
+
+    $result = $middleware->execute(Operation::create(new stdClass()), $handler);
+
+    expect($result->result?->value)->toBe('done')
+        ->and($listener->events)->toBe([
+            CommandProcessEvent::class,
+            CommandProcessedEvent::class,
+        ]);
+});
+
+it('never suppresses locator and configuration failures', function (): void {
+    $locator = new class implements CommandListenersLocatorInterface {
+        public function locateFor(
+            CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
+        ): iterable {
+            throw new RuntimeException('locator failed');
+            yield;
+        }
+    };
+    $middleware = new EventMiddleware(
+        $locator,
+        suppressExceptions: true,
+    );
+    $handler = new class implements OperationHandlerInterface {
+        public function handle(OperationInterface $operation): OperationInterface
+        {
+            return $operation;
+        }
+    };
+
+    expect(fn() => $middleware->execute(Operation::create(new stdClass()), $handler))
+        ->toThrow(RuntimeException::class, 'locator failed');
+});
