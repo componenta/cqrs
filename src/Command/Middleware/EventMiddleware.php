@@ -12,39 +12,19 @@ use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Throwable;
 
-/**
- * Dispatches events during command lifecycle.
- *
- * Events:
- * - CommandProcessEvent: Before execution
- * - CommandProcessedEvent: After successful execution
- * - CommandFailedEvent: On exception (before rethrow)
- *
- * @example
- * ```php
- * // Production: ignore listener failures
- * $middleware = new EventMiddleware($locator);
- *
- * // Development: fail fast on listener errors
- * $middleware = new EventMiddleware($locator, suppressExceptions: false);
- * ```
- */
+/** Dispatches command lifecycle events. */
 final readonly class EventMiddleware implements MiddlewareInterface
 {
     /**
-     * @param CommandListenersLocatorInterface $locator Locates listeners for events
-     * @param bool $suppressExceptions If true, exceptions from locator and listeners
-     *        are silently ignored. If false, exceptions propagate and interrupt
-     *        command execution. Default: true (production-safe).
+     * Locator and configuration failures always propagate. When suppression is
+     * enabled, only failures thrown by an individual listener body are ignored.
      */
     public function __construct(
         private CommandListenersLocatorInterface $locator,
-        private bool $suppressExceptions = true,
+        private bool $suppressExceptions = false,
     ) {}
 
-    /**
-     * @throws Throwable
-     */
+    /** @throws Throwable */
     public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
     {
         $this->dispatch(new CommandProcessEvent($operation));
@@ -66,30 +46,21 @@ final readonly class EventMiddleware implements MiddlewareInterface
         return $operation;
     }
 
-    /**
-     * @throws Throwable
-     */
+    /** @throws Throwable */
     private function dispatch(
         CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
-    ): void
-    {
-        try {
-            foreach ($this->locator->locateFor($event) as $listener) {
-                try {
-                    $listener->handleEvent($event);
-                } catch (Throwable $e) {
-                    if (!$this->suppressExceptions) {
-                        throw $e;
-                    }
-                }
-
-                if ($event->isPropagationStopped) {
-                    return;
+    ): void {
+        foreach ($this->locator->locateFor($event) as $listener) {
+            try {
+                $listener->handleEvent($event);
+            } catch (Throwable $exception) {
+                if (!$this->suppressExceptions) {
+                    throw $exception;
                 }
             }
-        } catch (Throwable $e) {
-            if (!$this->suppressExceptions) {
-                throw $e;
+
+            if ($event->isPropagationStopped) {
+                return;
             }
         }
     }
