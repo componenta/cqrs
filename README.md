@@ -188,7 +188,6 @@ Order is behavior. Keep cross-cutting concerns in middleware instead of hiding t
 | `#[Componenta\CQRS\Retry\Attribute\Retry]` | command class | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Metadata supplied by `componenta/cqrs-retry`. |
 | `#[Componenta\CQRS\Lock\Attribute\Lock]` | command class | `string $key, float $ttl = 300.0, bool $blocking = true` | Metadata supplied by `componenta/cqrs-lock`. |
 
-
 ## Command Events
 
 | Event | When |
@@ -197,7 +196,7 @@ Order is behavior. Keep cross-cutting concerns in middleware instead of hiding t
 | `CommandProcessedEvent` | After successful execution. |
 | `CommandFailedEvent` | After failure, before the exception is rethrown. |
 
-Listeners are resolved through `CommandListenersLocatorInterface`. `EventMiddleware` suppresses listener failures by default. Use `suppressExceptions: false` for fail-fast development behavior.
+Listeners are resolved through `CommandListenersLocatorInterface`. Listener failures propagate by default in every environment. An explicitly constructed `EventMiddleware` may use `suppressExceptions: true` to ignore only exceptions thrown by listener bodies; locator, map, and DI failures always propagate.
 
 ## Queries
 
@@ -231,7 +230,6 @@ Handlers are resolved through `QueryHandlerLocatorInterface`. `#[AsQueryHandler(
 | Missing command handler | `Componenta\CQRS\Command\Exception\HandlerNotFoundException` |
 | Invalid command handler | `Componenta\CQRS\Command\Exception\InvalidHandlerException` |
 | Missing query handler | `Componenta\CQRS\Query\Exception\HandlerNotFoundException` |
-
 
 ## Migration From v1
 
