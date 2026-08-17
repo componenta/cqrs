@@ -153,7 +153,6 @@ Core middleware:
 | `#[Componenta\CQRS\Retry\Attribute\Retry]` | класс команды | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Метаданные из `componenta/cqrs-retry`. |
 | `#[Componenta\CQRS\Lock\Attribute\Lock]` | класс команды | `string $key, float $ttl = 300.0, bool $blocking = true` | Метаданные из `componenta/cqrs-lock`. |
 
-
 ## События команд
 
 | Event | Когда |
@@ -162,7 +161,7 @@ Core middleware:
 | `CommandProcessedEvent` | После успешного выполнения. |
 | `CommandFailedEvent` | После ошибки, перед повторным выбросом exception. |
 
-Listeners ищутся через `CommandListenersLocatorInterface`. `EventMiddleware` по умолчанию подавляет ошибки listeners. Для fail-fast поведения в development используйте `suppressExceptions: false`.
+Listeners ищутся через `CommandListenersLocatorInterface`. Ошибки listener-ов по умолчанию распространяются одинаково во всех окружениях. Явно созданный `EventMiddleware` может использовать `suppressExceptions: true`, чтобы игнорировать только исключения из тела listener-а; ошибки locator, карты и DI всегда распространяются.
 
 ## Запросы
 
@@ -196,7 +195,6 @@ Handlers ищутся через `QueryHandlerLocatorInterface`. `#[AsQueryHandl
 | Command handler не найден | `Componenta\CQRS\Command\Exception\HandlerNotFoundException` |
 | Некорректный command handler | `Componenta\CQRS\Command\Exception\InvalidHandlerException` |
 | Query handler не найден | `Componenta\CQRS\Query\Exception\HandlerNotFoundException` |
-
 
 ## Переход с v1
 
