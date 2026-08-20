@@ -1,16 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Command\Resolver;
 
 final class CompositeCommandNameResolver implements CommandNameResolverInterface
 {
-    /**
-     * @var CommandNameResolverInterface []
-     */
-    private array $resolvers = [];
+    /** @var list<CommandNameResolverInterface> */
+    private array $resolvers;
+
     public function __construct(
         private CommandNameResolverInterface $fallback,
-        CommandNameResolverInterface ... $resolvers,
+        CommandNameResolverInterface ...$resolvers,
     ) {
         $this->resolvers = $resolvers;
     }
@@ -26,7 +27,9 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
     public function resolve(object $command): string
     {
         foreach ($this->resolvers as $resolver) {
-            if ($resolver->supports($command)) return $resolver->resolve($command);
+            if ($resolver->supports($command)) {
+                return $resolver->resolve($command);
+            }
         }
 
         return $this->fallback->resolve($command);
