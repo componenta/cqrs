@@ -1,8 +1,8 @@
 # Componenta CQRS
 
-`componenta/cqrs` — базовый CQRS runtime для PHP 8.4+. Пакет содержит command/query bus, локаторы обработчиков, объект операции команды, события команд и атрибуты discovery, которые использует application-level tooling.
+`componenta/cqrs` — нейтральный CQRS runtime для PHP 8.4+. Пакет предоставляет command/query bus, immutable command operations, middleware contracts, локаторы handlers/listeners, lifecycle events команд, metadata access и версионированную CQRS-карту.
 
-В core остаются только нейтральные части runtime. Middleware, которым нужны policy, locks, очереди, транзакции базы данных или console integration, вынесены в отдельные пакеты.
+Policy, retry, locking, transactions, async transport, workers и application discovery вынесены в отдельные пакеты.
 
 ## Установка
 
@@ -10,202 +10,155 @@
 composer require componenta/cqrs
 ```
 
-## Зависимости
+## Runtime services
 
-| Зависимость | Назначение |
-|---|---|
-| PHP `>=8.4` | Современные возможности языка и strict types. |
-| `componenta/arrayable` | Общий контракт преобразования в массив. |
-| `componenta/config` | Интеграция с config provider. |
-| `componenta/di` | Вызов handlers/listeners через `CallableInvokerInterface`. |
-| `componenta/iterator` | Iterator helpers для локаторов. |
-| `componenta/reflection` | Metadata helpers для command attributes. |
-| `psr/container` | Получение сервисов. |
-| `ramsey/uuid` | Идентификаторы операций. |
+Зарегистрируйте `Componenta\CQRS\ConfigProvider`. Он предоставляет стандартные command/query bus, locators, operation factory, metadata provider и CQRS map provider.
 
-## Дополнительные пакеты
-
-| Пакет | Что добавляет |
-|---|---|
-| `componenta/cqrs-policy` | Policy middleware для команд и запросов. Для публичных сценариев используйте `#[Allow]` из `componenta/policy`; skip-policy флаги не должны быть моделью публичного доступа. |
-| `componenta/cqrs-retry` | Retry middleware для команд с `#[Retry]`. |
-| `componenta/cqrs-lock` | Symfony Lock middleware для команд с `#[Lock]`. |
-| `componenta/cqrs-transaction-cycle` | Transaction middleware для Cycle Database. |
-| `componenta/cqrs-transport` | Transport contracts, serializer, async middleware и command worker. |
-| `componenta/cqrs-transport-cycle` | Реализация транспорта на Cycle Database. |
-| `componenta/cqrs-transport-console` | Symfony Console команда воркера. |
-| `componenta/cqrs-app` | Attribute discovery и build-time map compilers. |
-
-## Быстрый старт
+Основные ключи конфигурации:
 
 ```php
-use Componenta\Config\ConfigLoader;
-use Componenta\CQRS\Command\CommandBusInterface;
-use Componenta\CQRS\ConfigKey;
-use Componenta\CQRS\Map\CqrsMap;
-use Componenta\CQRS\Map\HandlerDescriptor;
-use Componenta\DI\ContainerBuilder;
-
-final readonly class CalculateTotalCommand
-{
-    public function __construct(
-        public int $price,
-        public int $quantity,
-    ) {}
-}
-
-final readonly class CalculateTotalHandler
-{
-    public function __invoke(CalculateTotalCommand $command): int
-    {
-        return $command->price * $command->quantity;
-    }
-}
-
-$config = ConfigLoader::load(
-    null,
-    new Componenta\CQRS\ConfigProvider(),
-    static fn(): array => [
-        ConfigKey::CQRS_MAP => (new CqrsMap(
-            commandHandlers: [
-                CalculateTotalCommand::class
-                    => new HandlerDescriptor(CalculateTotalHandler::class, '__invoke'),
-            ],
-        ))->toArray(),
-    ],
-);
-$container = ContainerBuilder::configure($config)->build();
-
-/** @var CommandBusInterface $commands */
-$commands = $container->get(CommandBusInterface::class);
-$operation = $commands->dispatch(new CalculateTotalCommand(price: 50, quantity: 3));
-
-$result = $operation->result?->value; // 150
+Componenta\CQRS\ConfigKey::COMMAND_MIDDLEWARES;
+Componenta\CQRS\ConfigKey::QUERY_MIDDLEWARES;
+Componenta\CQRS\ConfigKey::CQRS_MAP;
+Componenta\CQRS\ConfigKey::COMMAND_METADATA_ATTRIBUTES;
 ```
 
-## Конфигурация
-
-Зарегистрируйте runtime provider:
-
-```php
-return [
-    new Componenta\CQRS\ConfigProvider(),
-];
-```
-
-Provider регистрирует:
-
-| Сервис | Назначение |
-|---|---|
-| `CommandBusInterface` | Выполняет команды через настроенную command middleware chain. |
-| `QueryBusInterface` | Выполняет запросы через настроенную query middleware chain. |
-| `CommandHandlerLocatorInterface` | Разрешает дескрипторы обработчиков команд из активного `CqrsMapProviderInterface`. |
-| `CommandListenersLocatorInterface` | Фильтрует и разрешает дескрипторы слушателей из того же снимка карты. |
-| `QueryHandlerLocatorInterface` | Разрешает дескрипторы обработчиков запросов из того же снимка карты. |
-| `CommandMetadataProviderInterface` | Возвращает любой зарегистрированный тип атрибута команды из карты v2; reflection используется только для неизвестных карте команд. |
-
-Основные ключи:
-
-| Ключ | Значение |
-|---|---|
-| `ConfigKey::COMMAND_MIDDLEWARES` | Список command middleware в порядке выполнения. |
-| `ConfigKey::QUERY_MIDDLEWARES` | Список query middleware в порядке выполнения. |
-| `ConfigKey::CQRS_MAP` | Единый версионированный артефакт с обработчиками команд и запросов, слушателями, метаданными и известными командами. |
-| `ConfigKey::COMMAND_METADATA_ATTRIBUTES` | Классы атрибутов, которые должен обнаружить и скомпилировать `componenta/cqrs-app`. Дополнительные пакеты добавляют сюда свои атрибуты. |
-
-Отсутствие ключа middleware означает пустую цепочку. Middleware из дополнительных пакетов добавляется приложением, когда нужны проверки прав, повторные попытки, блокировки, транзакции, асинхронное выполнение или воркеры.
-
-Пустые секции карты не записываются: пустой валидный артефакт имеет вид `['version' => 2]`. В `APP_ENV=production` актуальная карта обязательна. В остальных окружениях `componenta/cqrs-app` может добавить к пустой базовой карте данные текущего обнаружения классов. Старые ключи карт и неподдерживаемые версии завершаются ошибкой с требованием очистить кеши и выполнить `app:build`.
+Middleware выполняются в порядке, указанном в конфигурации. Отсутствующий middleware key означает пустую цепочку.
 
 ## Команды
 
-Команда — объект с данными для сценария, который меняет состояние. `CommandBusInterface::dispatch(object $command, array $attributes = [])` возвращает immutable `OperationInterface` с id операции, attributes и result, если команда выполнена синхронно.
+Один вызов `CommandBusInterface::dispatch()` создаёт одну `OperationInterface` и проводит её через полный command pipeline:
 
-Обработчики ищутся через `CommandHandlerLocatorInterface`. Дескриптор карты хранит id сервиса и метод; callable лениво разрешается через контейнер и запоминается локатором.
+```php
+$operation = $commands->dispatch(new CreateUserCommand($email));
+$result = $operation->result?->value;
+```
 
-`#[AsCommandHandler(?string $command = null)]` — discovery metadata для `componenta/cqrs-app`. Если command не указан, `cqrs-app` выводит его из параметра handler.
+Operation содержит UUID v7, command instance, timestamp, attributes и `OperationResult` после синхронного завершения.
 
-## Command Middleware
+### Несколько команд
+
+`BatchCommandBus` декорирует `CommandBusInterface` и добавляет явный последовательный multi-dispatch:
+
+```php
+$batch = new Componenta\CQRS\Command\BatchCommandBus($commands);
+
+$operations = $batch->dispatchMany([
+    new FirstCommand(),
+    new SecondCommand(),
+]);
+```
+
+Каждая команда независимо проходит через wrapped bus и получает собственную operation. `dispatchMany()` предварительно буферизует и валидирует iterable, затем сохраняет исходный порядок команд.
+
+Nested-вызовы `CommandBusInterface::dispatch()` имеют обычную reentrant-семантику. Core больше не содержит `SequentialMiddleware` и не откладывает nested commands скрытой очередью. Если действие должно произойти после завершения текущей команды или транзакции, используйте явную модель: events, outbox, async transport или workflow/process manager.
+
+## Command middleware
 
 Command middleware реализует:
 
 ```php
-public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface;
+public function execute(
+    OperationInterface $operation,
+    OperationHandlerInterface $handler,
+): OperationInterface;
 ```
 
-Core middleware:
+В core находится `EventMiddleware`; `HandleCommandHandler` является terminal operation handler и подключается bus factory отдельно.
 
-| Middleware | Ответственность |
-|---|---|
-| `SequentialMiddleware` | Выполняет nested dispatch после root command. |
-| `EventMiddleware` | Публикует command lifecycle events. |
-| `HandleCommandHandler` | Terminal handler, который находит и вызывает command handler. Bus factory подключает его отдельно. |
+Порядок middleware является частью поведения. В частности, если одновременно используются retry и transaction middleware, retry должен оборачивать transaction middleware, чтобы каждая попытка имела собственную transaction boundary.
 
-Порядок middleware является частью поведения. Cross-cutting concerns лучше держать в middleware, а не прятать в handlers.
+## Command lifecycle events
 
-## Атрибуты команд
+`EventMiddleware` может публиковать:
 
-| Атрибут | Target | Constructor | Поведение |
-|---|---|---|---|
-| `#[AsCommandHandler]` | class или method | `?string $command = null` | Discovery metadata для command handlers. |
-| `#[AsCommandListener]` | class | `string $command, int $priority = 0, array $eventTypes = []` | Discovery metadata для command event listeners. |
-| `#[Componenta\CQRS\Transport\Attribute\Async]` | класс команды | `string $transport = 'default', int $delay = 0` | Метаданные из `componenta/cqrs-transport`. |
-| `#[Componenta\CQRS\Retry\Attribute\Retry]` | класс команды | `int $attempts = 3, int $delayMs = 100, float $multiplier = 1.0, int $maxDelayMs = 10000` | Метаданные из `componenta/cqrs-retry`. |
-| `#[Componenta\CQRS\Lock\Attribute\Lock]` | класс команды | `string $key, float $ttl = 300.0, bool $blocking = true` | Метаданные из `componenta/cqrs-lock`. |
+- `CommandProcessEvent` до выполнения handler;
+- `CommandProcessedEvent` после успешного выполнения;
+- `CommandFailedEvent` после ошибки перед повторным выбросом exception.
 
-## События команд
+Ошибки listeners по умолчанию распространяются. Явно созданный `EventMiddleware` может подавлять только ошибки тела listener; ошибки locator, map и DI продолжают распространяться.
 
-| Event | Когда |
-|---|---|
-| `CommandProcessEvent` | До выполнения команды. |
-| `CommandProcessedEvent` | После успешного выполнения. |
-| `CommandFailedEvent` | После ошибки, перед повторным выбросом exception. |
-
-Listeners ищутся через `CommandListenersLocatorInterface`. Ошибки listener-ов по умолчанию распространяются одинаково во всех окружениях. Явно созданный `EventMiddleware` может использовать `suppressExceptions: true`, чтобы игнорировать только исключения из тела listener-а; ошибки locator, карты и DI всегда распространяются.
-
-## Запросы
-
-Запросы описывают read use cases и сразу возвращают результат handler:
+## Queries
 
 ```php
-use Componenta\CQRS\Query\QueryBusInterface;
-
-$post = $queries->handle(new GetPostQuery($id));
+$result = $queries->handle(new GetUserQuery($id));
 ```
 
-`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` преобразует массивы в immutable `Context` до передачи в middleware.
+`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` нормализует array context в immutable `Context` до вызова query middleware.
 
-Handlers ищутся через `QueryHandlerLocatorInterface`. `#[AsQueryHandler(?string $query = null)]` — discovery metadata для `componenta/cqrs-app`.
+## CQRS map v2
 
-## Extension Points
+Runtime discovery и compiled execution используют одну версионированную модель карты. Пустой валидный артефакт имеет вид:
 
-| Что заменить | Contract | Когда использовать |
-|---|---|---|
-| Command name | `NamedCommandInterface` или `CommandNameResolverInterface` | Ключ handler map должен отличаться от FQCN команды. |
-| Query name | `NamedQueryInterface` или `QueryNameResolverInterface` | Ключ handler map должен отличаться от FQCN запроса. |
-| Command chain step | `Componenta\CQRS\Command\Middleware\MiddlewareInterface` | Нужен custom step вокруг command execution. |
-| Query chain step | `Componenta\CQRS\Query\Middleware\MiddlewareInterface` | Нужен custom step вокруг query execution. |
-| Command event listeners | `CommandListenerInterface` | Side effect должен реагировать на command events без изменения command handler. |
-| Метаданные команд | `CommandMetadataProviderInterface` | Метод `get($command, Attribute::class)` универсален; дополнительные пакеты регистрируют классы атрибутов через config. |
+```php
+['version' => 2]
+```
 
-## Ошибки
+Map содержит command handlers/listeners/known commands/metadata и query handlers. Сериализация детерминирована; конфликтующие handlers или metadata завершаются ошибкой вместо неявного перезаписывания.
 
-| Ошибка | Exception |
+### Поведение окружений
+
+Только `APP_ENV=development` может работать с пустой базовой картой и live discovery из `componenta/cqrs-app`.
+
+Любое другое значение окружения — включая `production`, `staging` и `test` — является compiled-only и требует актуальный v2-артефакт `ConfigKey::CQRS_MAP`. Отсутствующий, legacy или неподдерживаемый артефакт приводит к fail-fast ошибке.
+
+Production map собирается из development discovery:
+
+```bash
+APP_ENV=development php bin/console.php app:build
+```
+
+## Metadata
+
+`CommandMetadataProviderInterface` предоставляет metadata команд:
+
+```php
+$metadata->get($command, Attribute::class);
+$metadata->isKnown($command);
+```
+
+Стандартный compiled provider читает зарегистрированные attributes из активной CQRS map. Reflection fallback используется только для команд, неизвестных карте. Дополнительные пакеты регистрируют свои metadata attributes через `ConfigKey::COMMAND_METADATA_ATTRIBUTES`, чтобы `componenta/cqrs-app` обнаруживал и компилировал их.
+
+## Discovery attributes
+
+`componenta/cqrs-app` понимает:
+
+```php
+#[Componenta\CQRS\Command\Attribute\AsCommandHandler]
+#[Componenta\CQRS\Command\Attribute\AsCommandListener]
+#[Componenta\CQRS\Query\Attribute\AsQueryHandler]
+```
+
+Message обязан находиться в первом parameter slot handler. Дополнительные обязательные параметры handler не dependency-inject-ятся CQRS runtime.
+
+## Дополнительные пакеты
+
+| Пакет | Назначение |
 |---|---|
-| Command handler не найден | `Componenta\CQRS\Command\Exception\HandlerNotFoundException` |
-| Некорректный command handler | `Componenta\CQRS\Command\Exception\InvalidHandlerException` |
-| Query handler не найден | `Componenta\CQRS\Query\Exception\HandlerNotFoundException` |
+| `componenta/cqrs-app` | Development discovery и build-time compilation CQRS map |
+| `componenta/cqrs-policy` | Авторизация command/query |
+| `componenta/cqrs-retry` | Retry metadata и middleware |
+| `componenta/cqrs-lock` | Resource-lock metadata и middleware |
+| `componenta/cqrs-transaction-cycle` | Cycle Database transaction middleware |
+| `componenta/cqrs-transport` | Async transport contracts, serializers, middleware и worker |
+| `componenta/cqrs-transport-cycle` | Cycle Database transport |
+| `componenta/cqrs-transport-console` | Symfony Console worker |
 
-## Переход с v1
+## Extension points
 
-| v1 | v2 |
-|---|---|
-| `COMMAND_HANDLER_MAP` | `CQRS_MAP['commands']['handlers']` |
-| `QUERY_HANDLER_MAP` | `CQRS_MAP['queries']['handlers']` |
-| `COMMAND_LISTENER_MAP` | `CQRS_MAP['commands']['listeners']` |
-| `COMMAND_ATTRIBUTE_MAP` | `CQRS_MAP['commands']['metadata']` |
-| `COMPILED_MAPS` | Удалён: режим определяется версией карты и окружением. |
-| `CommandAttributeProviderInterface` | `CommandMetadataProviderInterface` |
-| `async()/retry()/lock()` | `get($command, Attribute::class)` |
+- `CommandBusInterface` / `QueryBusInterface` — альтернативные bus/decorators;
+- `OperationFactoryInterface` — custom operation construction;
+- command/query `MiddlewareInterface` — cross-cutting execution behavior;
+- `CommandNameResolverInterface` / `QueryNameResolverInterface` — custom message names;
+- locator interfaces — альтернативное разрешение handlers/listeners;
+- `CommandMetadataProviderInterface` — альтернативный источник metadata;
+- `CqrsMapProviderInterface` — альтернативный immutable map source.
 
-После обновления удалите кеши конфигурации, обнаружения классов, старых CQRS-карт, generated resolver и release fingerprint, затем выполните `APP_ENV=development php bin/console.php app:build`.
+## Проверка
+
+```bash
+composer test
+composer analyse
+```
+
+CI проверяет PHP 8.4/8.5, test suite и PHPStan на максимальном уровне.
