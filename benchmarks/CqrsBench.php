@@ -52,19 +52,23 @@ final class CqrsBench
         $this->commandBusWithoutMiddleware = new CommandBus($commandHandler);
         $this->commandBusWithTwoMiddlewares = new CommandBus(
             $commandHandler,
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
+            [
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+            ],
         );
         $this->commandBusWithEightMiddlewares = new CommandBus(
             $commandHandler,
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
-            new BenchmarkCommandMiddleware(),
+            [
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+                new BenchmarkCommandMiddleware(),
+            ],
         );
 
         $this->queryBusWithoutMiddleware = new QueryBus($queryHandler);
@@ -107,7 +111,6 @@ final class CqrsBench
                     ],
                 ],
             ])),
-            $this->reflectionCommandMetadata,
         );
 
         $this->command = new BenchmarkCommand('payload');
