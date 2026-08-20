@@ -70,29 +70,29 @@ public function execute(
 
 `HandleCommandHandler` является terminal handler. `EventMiddleware` предоставляет lifecycle events команды.
 
-### Жёсткие ограничения порядка
+### Порядок middleware
 
-`#[Componenta\CQRS\Command\Middleware\MiddlewareOrder]` нужен только там, где относительный порядок является инвариантом корректности или безопасности. Это не generic priority system.
+Middleware выполняются ровно в том порядке, который задаёт приложение. `CommandBus` валидирует список middleware и компилирует его без автоматической перестановки и без знания о семантике optional packages.
 
-```php
-#[MiddlewareOrder(
-    before: [TransactionMiddleware::class],
-    after: [PolicyMiddleware::class],
-)]
-final class ExampleMiddleware implements MiddlewareInterface
-{
-}
+Поэтому порядок является частью конфигурации приложения. Например:
+
+```text
+RetryMiddleware
+  TransactionMiddleware
+    handler
 ```
 
-`CommandBus` проверяет constraints до компиляции pipeline. Если target middleware отсутствует, constraint игнорируется; если оба middleware присутствуют, неправильный порядок приводит к fail-fast. Поэтому ручной bus и DI/compiled container используют одинаковый ordering contract.
+создаёт отдельную transaction для каждой retry-попытки, а:
 
-В текущем поколении hard ordering применяется, например, для:
+```text
+TransactionMiddleware
+  RetryMiddleware
+    handler
+```
 
-- authorization до command side effects и async enqueue;
-- async transport до execution-only middleware на producer-side;
-- retry снаружи transaction, чтобы каждая попытка имела собственную transaction boundary.
+оставляет все retry-попытки внутри одной внешней transaction. CQRS core не запрещает ни один вариант: приложение выбирает нужную семантику.
 
-Остальной относительный порядок остаётся ответственностью приложения.
+README optional-пакетов описывают рекомендуемые композиции и последствия разных порядков, но ответственность за итоговую topology остаётся у приложения.
 
 ## Command lifecycle events
 
@@ -102,7 +102,7 @@ final class ExampleMiddleware implements MiddlewareInterface
 - `CommandProcessedEvent` после успеха;
 - `CommandFailedEvent` после ошибки перед повторным выбросом exception.
 
-Ошибки listeners по умолчанию распространяются. При наличии command policy lifecycle events выполняются после авторизации.
+Ошибки listeners по умолчанию распространяются. Положение `EventMiddleware` относительно policy, transport, retry, lock, transaction и пользовательских middleware определяется конфигурацией приложения.
 
 ## Queries
 
