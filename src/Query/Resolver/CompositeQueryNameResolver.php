@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query\Resolver;
 
 final class CompositeQueryNameResolver implements QueryNameResolverInterface
 {
-    /** @var QueryNameResolverInterface[] */
+    /** @var list<QueryNameResolverInterface> */
     private array $resolvers;
 
     public function __construct(
         private QueryNameResolverInterface $fallback,
-        QueryNameResolverInterface ...$resolvers
+        QueryNameResolverInterface ...$resolvers,
     ) {
         $this->resolvers = $resolvers;
     }
