@@ -40,8 +40,7 @@ function middlewareOrderTerminal(): OperationHandlerInterface
 it('accepts command middleware satisfying declared ordering constraints', function (): void {
     $bus = new CommandBus(
         middlewareOrderTerminal(),
-        new OrderOuterMiddleware(),
-        new OrderInnerMiddleware(),
+        [new OrderOuterMiddleware(), new OrderInnerMiddleware()],
     );
 
     expect($bus->dispatch(new stdClass())->result?->value)->toBe('ok');
@@ -50,8 +49,7 @@ it('accepts command middleware satisfying declared ordering constraints', functi
 it('rejects middleware placed after a type it declares in before', function (): void {
     expect(fn() => new CommandBus(
         middlewareOrderTerminal(),
-        new OrderInnerMiddleware(),
-        new OrderOuterMiddleware(),
+        [new OrderInnerMiddleware(), new OrderOuterMiddleware()],
     ))->toThrow(
         InvalidArgumentException::class,
         'must be registered before',
@@ -61,7 +59,7 @@ it('rejects middleware placed after a type it declares in before', function (): 
 it('ignores ordering targets that are not present in the command bus', function (): void {
     $bus = new CommandBus(
         middlewareOrderTerminal(),
-        new OrderOuterMiddleware(),
+        [new OrderOuterMiddleware()],
     );
 
     expect($bus->dispatch(new stdClass())->result?->value)->toBe('ok');
