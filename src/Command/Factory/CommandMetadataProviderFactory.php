@@ -6,7 +6,6 @@ namespace Componenta\CQRS\Command\Factory;
 
 use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
 use Componenta\CQRS\Command\Metadata\CompiledCommandMetadataProvider;
-use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use LogicException;
 use Psr\Container\ContainerInterface;
@@ -25,9 +24,6 @@ final class CommandMetadataProviderFactory
             ));
         }
 
-        return new CompiledCommandMetadataProvider(
-            $mapProvider,
-            new ReflectionCommandMetadataProvider(),
-        );
+        return new CompiledCommandMetadataProvider($mapProvider);
     }
 }
