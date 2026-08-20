@@ -16,7 +16,7 @@ final readonly class Operation implements OperationInterface
     public function __construct(
         public UuidInterface $id,
         public object $command,
-        public DateTimeImmutable $startedAt,
+        public DateTimeImmutable $createdAt,
         private(set) array $attributes = [],
         public ?OperationResult $result = null,
     ) {
@@ -29,7 +29,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: Uuid::uuid7(),
             command: $command,
-            startedAt: new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            createdAt: new DateTimeImmutable('now', new DateTimeZone('UTC')),
             attributes: $attributes,
         );
     }
@@ -43,7 +43,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: $this->id,
             command: $this->command,
-            startedAt: $this->startedAt,
+            createdAt: $this->createdAt,
             attributes: $this->attributes,
             result: $result,
         );
@@ -54,7 +54,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: $this->id,
             command: $this->command,
-            startedAt: $this->startedAt,
+            createdAt: $this->createdAt,
             attributes: $attributes,
             result: $this->result,
         );
@@ -67,7 +67,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: $this->id,
             command: $this->command,
-            startedAt: $this->startedAt,
+            createdAt: $this->createdAt,
             attributes: [...$this->attributes, $name => $value],
             result: $this->result,
         );
@@ -83,7 +83,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: $this->id,
             command: $this->command,
-            startedAt: $this->startedAt,
+            createdAt: $this->createdAt,
             attributes: $attributes,
             result: $this->result,
         );
