@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Componenta\CQRS\Command\CommandBus;
+use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\MiddlewareOrder;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
@@ -63,4 +64,18 @@ it('ignores ordering targets that are not present in the command bus', function 
     );
 
     expect($bus->dispatch(new stdClass())->result?->value)->toBe('ok');
+});
+
+it('keeps command lifecycle events behind the optional policy boundary', function (): void {
+    $attributes = (new ReflectionClass(EventMiddleware::class))
+        ->getAttributes(MiddlewareOrder::class);
+
+    expect($attributes)->toHaveCount(1);
+
+    /** @var MiddlewareOrder $order */
+    $order = $attributes[0]->newInstance();
+
+    expect($order->after)->toBe([
+        Componenta\CQRS\Command\Middleware\PolicyMiddleware::class,
+    ])->and($order->before)->toBe([]);
 });
