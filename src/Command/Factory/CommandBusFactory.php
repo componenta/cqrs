@@ -6,9 +6,9 @@ namespace Componenta\CQRS\Command\Factory;
 
 use Componenta\Config\Config;
 use Componenta\CQRS\Command\CommandBus;
-use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
+use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
@@ -84,6 +84,10 @@ final class CommandBusFactory
             ));
         }
 
-        return new CommandBus($handler, $operationFactory, ...$middlewares);
+        return new CommandBus(
+            commandHandler: $handler,
+            middlewares: $middlewares,
+            operationFactory: $operationFactory,
+        );
     }
 }
