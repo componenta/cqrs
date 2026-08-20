@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query\Resolver;
 
 use Componenta\CQRS\Query\NamedQueryInterface;
@@ -14,6 +16,8 @@ trait QueryNameResolution
             return $this->resolver->resolve($query);
         }
 
-        return $query instanceof NamedQueryInterface ? $query->queryName : $query::class;
+        return $query instanceof NamedQueryInterface
+            ? $query->queryName
+            : $query::class;
     }
 }
