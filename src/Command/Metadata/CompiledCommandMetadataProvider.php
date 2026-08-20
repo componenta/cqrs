@@ -10,12 +10,18 @@ use Componenta\CQRS\Map\Exception\InvalidCqrsMapException;
 use ReflectionClass;
 use Throwable;
 
-final class CompiledCommandMetadataProvider implements CommandMetadataProviderInterface
+/**
+ * Reads command metadata strictly from the active CQRS map.
+ *
+ * Runtime reflection is intentionally not used as a fallback. This keeps
+ * development, compiled production, workers, and manually constructed
+ * containers on the same metadata contract. Applications that deliberately
+ * want reflection may bind ReflectionCommandMetadataProvider explicitly.
+ */
+final readonly class CompiledCommandMetadataProvider implements CommandMetadataProviderInterface
 {
     public function __construct(
-        private readonly CqrsMapProviderInterface $mapProvider,
-        private readonly CommandMetadataProviderInterface $fallback
-            = new ReflectionCommandMetadataProvider(),
+        private CqrsMapProviderInterface $mapProvider,
     ) {
     }
 
@@ -27,30 +33,26 @@ final class CompiledCommandMetadataProvider implements CommandMetadataProviderIn
      */
     public function get(object|string $command, string $attribute): ?object
     {
-        $command = self::className($command);
-        $map = $this->mapProvider->map();
-        $descriptor = $map->commandMetadata($command, $attribute);
+        $descriptor = $this->mapProvider->map()->commandMetadata(
+            self::className($command),
+            $attribute,
+        );
 
-        if ($descriptor !== null) {
-            return self::materialize(
-                $attribute,
-                $descriptor->arguments,
-            );
-        }
-
-        if ($map->isKnownCommand($command)) {
+        if ($descriptor === null) {
             return null;
         }
 
-        return $this->fallback->get(
-            $command,
+        return self::materialize(
             $attribute,
+            $descriptor->arguments,
         );
     }
 
     public function isKnown(object|string $command): bool
     {
-        return $this->mapProvider->map()->isKnownCommand(self::className($command));
+        return $this->mapProvider->map()->isKnownCommand(
+            self::className($command),
+        );
     }
 
     /**
@@ -74,9 +76,7 @@ final class CompiledCommandMetadataProvider implements CommandMetadataProviderIn
         }
     }
 
-    /**
-     * @param class-string $attribute
-     */
+    /** @param class-string $attribute */
     private static function assertAttributeClass(string $attribute): void
     {
         if (!class_exists($attribute)) {
