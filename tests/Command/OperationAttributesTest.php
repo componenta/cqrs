@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\Command\OperationResult;
 
 it('preserves valid string operation attribute keys', function (): void {
     $operation = Operation::create(new stdClass(), [
@@ -16,6 +17,15 @@ it('preserves valid string operation attribute keys', function (): void {
         '__execution_mode' => 'sync',
         '01' => 'leading-zero-string',
     ]);
+});
+
+it('uses createdAt for operation creation time and preserves it across immutable copies', function (): void {
+    $operation = Operation::create(new stdClass());
+    $createdAt = $operation->createdAt;
+
+    expect($operation->withAttribute('trace_id', 'a')->createdAt)->toBe($createdAt)
+        ->and($operation->withAttributes(['trace_id' => 'b'])->createdAt)->toBe($createdAt)
+        ->and($operation->withResult(new OperationResult('ok'))->createdAt)->toBe($createdAt);
 });
 
 it('rejects integer attribute keys at operation construction boundaries', function (): void {
