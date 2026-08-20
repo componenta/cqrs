@@ -12,9 +12,9 @@ use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
-use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationFactoryInterface;
+use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Map\ConfigCqrsMapProvider;
@@ -46,7 +46,7 @@ function makeCommandBusCommand(string $tag): object
     };
 }
 
-it('dispatches a command without middleware and returns operation result', function () {
+it('dispatches a command without middleware and returns operation result', function (): void {
     $bus = new CommandBus(makeCommandBusTerminal());
 
     $operation = $bus->dispatch(makeCommandBusCommand('plain'));
@@ -54,14 +54,17 @@ it('dispatches a command without middleware and returns operation result', funct
     expect($operation->result?->value)->toBe('handled:plain');
 });
 
-it('uses a supplied operation factory before entering the middleware pipeline', function () {
+it('uses a supplied operation factory before entering the middleware pipeline', function (): void {
     $factory = new readonly class implements OperationFactoryInterface {
         public function create(object $command, array $attributes = []): OperationInterface
         {
             return Operation::create($command, [...$attributes, 'factory' => 'custom']);
         }
     };
-    $bus = new CommandBus(makeCommandBusTerminal(), $factory);
+    $bus = new CommandBus(
+        makeCommandBusTerminal(),
+        operationFactory: $factory,
+    );
 
     $operation = $bus->dispatch(makeCommandBusCommand('factory'), ['trace_id' => 'trace-2']);
 
@@ -71,7 +74,7 @@ it('uses a supplied operation factory before entering the middleware pipeline', 
     ]);
 });
 
-it('preserves dispatch attributes and result through the command pipeline', function () {
+it('preserves dispatch attributes and result through the command pipeline', function (): void {
     $command = makeCommandBusCommand('attributes');
     $bus = new CommandBus(makeCommandBusTerminal());
 
@@ -82,7 +85,7 @@ it('preserves dispatch attributes and result through the command pipeline', func
         ->and($operation->result?->value)->toBe('handled:attributes');
 });
 
-it('chains command middlewares in registration order, onion-style', function () {
+it('chains command middlewares in registration order, onion-style', function (): void {
     $observed = new ArrayObject();
 
     $makeMiddleware = static function (string $tag) use ($observed): MiddlewareInterface {
@@ -100,14 +103,23 @@ it('chains command middlewares in registration order, onion-style', function () 
         };
     };
 
-    $bus = new CommandBus(makeCommandBusTerminal($observed), $makeMiddleware('mw1'), $makeMiddleware('mw2'));
+    $bus = new CommandBus(
+        makeCommandBusTerminal($observed),
+        [$makeMiddleware('mw1'), $makeMiddleware('mw2')],
+    );
 
     $bus->dispatch(makeCommandBusCommand('ordered'));
 
-    expect($observed->getArrayCopy())->toBe(['mw1-before', 'mw2-before', 'handler', 'mw2-after', 'mw1-after']);
+    expect($observed->getArrayCopy())->toBe([
+        'mw1-before',
+        'mw2-before',
+        'handler',
+        'mw2-after',
+        'mw1-after',
+    ]);
 });
 
-it('allows command middleware to short-circuit the terminal handler', function () {
+it('allows command middleware to short-circuit the terminal handler', function (): void {
     $observed = new ArrayObject();
 
     $middleware = new readonly class($observed) implements MiddlewareInterface {
@@ -121,7 +133,7 @@ it('allows command middleware to short-circuit the terminal handler', function (
         }
     };
 
-    $bus = new CommandBus(makeCommandBusTerminal($observed), $middleware);
+    $bus = new CommandBus(makeCommandBusTerminal($observed), [$middleware]);
 
     $operation = $bus->dispatch(makeCommandBusCommand('short'));
 
@@ -129,7 +141,14 @@ it('allows command middleware to short-circuit the terminal handler', function (
         ->and($observed->getArrayCopy())->toBe(['middleware']);
 });
 
-it('propagates exceptions from the terminal command handler', function () {
+it('rejects invalid middleware collections at the public constructor boundary', function (): void {
+    expect(fn() => new CommandBus(
+        makeCommandBusTerminal(),
+        ['invalid'],
+    ))->toThrow(InvalidArgumentException::class, 'must implement');
+});
+
+it('propagates exceptions from the terminal command handler', function (): void {
     $terminal = new readonly class implements OperationHandlerInterface {
         public function handle(OperationInterface $operation): OperationInterface
         {
@@ -138,11 +157,11 @@ it('propagates exceptions from the terminal command handler', function () {
     };
     $bus = new CommandBus($terminal);
 
-    expect(fn () => $bus->dispatch(makeCommandBusCommand('boom')))
+    expect(fn() => $bus->dispatch(makeCommandBusCommand('boom')))
         ->toThrow(RuntimeException::class, 'command failed');
 });
 
-it('dispatches command listeners in priority order', function () {
+it('dispatches command listeners in priority order', function (): void {
     $observed = new ArrayObject();
     $makeListener = static function (string $name) use ($observed): CommandListenerInterface {
         return new readonly class($observed, $name) implements CommandListenerInterface {
@@ -180,7 +199,10 @@ it('dispatches command listeners in priority order', function () {
         'listener.high' => $makeListener('high'),
     ]));
 
-    $bus = new CommandBus(makeCommandBusTerminal(), new EventMiddleware($locator, suppressExceptions: false));
+    $bus = new CommandBus(
+        makeCommandBusTerminal(),
+        [new EventMiddleware($locator, suppressExceptions: false)],
+    );
 
     $bus->dispatch(new CommandBusContractCommand('listeners'));
 
