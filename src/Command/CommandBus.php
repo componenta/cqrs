@@ -11,13 +11,7 @@ use Componenta\CQRS\Command\Middleware\PipelineHandler;
 use InvalidArgumentException;
 use ReflectionClass;
 
-/**
- * Command bus implementation with middleware pipeline support.
- *
- * Dispatches commands through a chain of middlewares, with a terminal handler
- * that executes the actual command. Middlewares can intercept, modify, or
- * decorate command execution (logging, transactions, events, etc.).
- */
+/** Command bus implementation with middleware pipeline support. */
 final readonly class CommandBus implements CommandBusInterface
 {
     private OperationHandlerInterface $pipeline;
@@ -25,35 +19,35 @@ final readonly class CommandBus implements CommandBusInterface
 
     /**
      * @param OperationHandlerInterface $commandHandler Terminal command operation handler.
-     * @param MiddlewareInterface|OperationFactoryInterface ...$middlewares Middleware in execution order
-     *        and, at most once, a custom operation factory.
+     * @param list<MiddlewareInterface> $middlewares Middleware in execution order.
+     * @param OperationFactoryInterface|null $operationFactory Custom operation factory.
      */
     public function __construct(
         OperationHandlerInterface $commandHandler,
-        MiddlewareInterface|OperationFactoryInterface ...$middlewares,
+        array $middlewares = [],
+        ?OperationFactoryInterface $operationFactory = null,
     ) {
-        $operationFactory = null;
-        $pipelineMiddlewares = [];
-
-        foreach ($middlewares as $component) {
-            if ($component instanceof OperationFactoryInterface) {
-                if ($operationFactory !== null) {
-                    throw new InvalidArgumentException(
-                        'Command bus accepts at most one operation factory.',
-                    );
-                }
-
-                $operationFactory = $component;
-                continue;
-            }
-
-            $pipelineMiddlewares[] = $component;
+        if (!array_is_list($middlewares)) {
+            throw new InvalidArgumentException(
+                'Command middleware collection must be a list.',
+            );
         }
 
-        self::assertMiddlewareOrder($pipelineMiddlewares);
+        foreach ($middlewares as $index => $middleware) {
+            if (!$middleware instanceof MiddlewareInterface) {
+                throw new InvalidArgumentException(sprintf(
+                    'Command middleware at index %d must implement %s; got %s.',
+                    $index,
+                    MiddlewareInterface::class,
+                    get_debug_type($middleware),
+                ));
+            }
+        }
+
+        self::assertMiddlewareOrder($middlewares);
 
         $this->operationFactory = $operationFactory ?? new OperationFactory();
-        $this->pipeline = PipelineHandler::compile($commandHandler, $pipelineMiddlewares);
+        $this->pipeline = PipelineHandler::compile($commandHandler, $middlewares);
     }
 
     /** @param array<string, mixed> $attributes */
