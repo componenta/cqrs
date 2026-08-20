@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query\Resolver;
 
 use Componenta\CQRS\Query\NamedQueryInterface;
