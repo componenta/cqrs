@@ -12,7 +12,8 @@ use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Throwable;
 
-/** Dispatches command lifecycle events. */
+/** Dispatches command lifecycle events after authorization middleware. */
+#[MiddlewareOrder(after: [PolicyMiddleware::class])]
 final readonly class EventMiddleware implements MiddlewareInterface
 {
     /**
