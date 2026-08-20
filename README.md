@@ -36,15 +36,7 @@ $result = $operation->result?->value;
 
 `CommandBusInterface::dispatch(object $command, array $attributes = [])` creates one `OperationInterface` and sends that operation through the complete configured command pipeline.
 
-The operation contains:
-
-- a UUID v7 operation ID;
-- the command instance;
-- creation/start timestamp;
-- operation attributes;
-- an `OperationResult` after synchronous completion, or `null` while no synchronous result exists.
-
-One command dispatch corresponds to one operation.
+The operation contains a UUID v7 operation ID, the command instance, timestamp, operation attributes, and an `OperationResult` after synchronous completion. One command dispatch corresponds to one operation.
 
 ### Dispatching multiple commands
 
@@ -76,7 +68,7 @@ public function execute(
 
 The core runtime contains `EventMiddleware`; `HandleCommandHandler` is the terminal operation handler and is wired separately by the bus factory.
 
-Middleware order is behavior. Cross-package ordering requirements must be respected by the application. In particular, retry middleware must wrap transaction middleware when both are used, so every retry attempt gets a separate transaction boundary.
+Middleware order is behavior. Hard cross-package requirements can be declared with `#[MiddlewareOrder(before: [...], after: [...])]`; `CommandBus` validates them before compiling the pipeline, so manual construction and DI-created buses use the same rules. Optional packages use this for invariants such as retry outside transaction and policy before async transport.
 
 ## Command lifecycle events
 
@@ -100,48 +92,7 @@ $result = $queries->handle(new GetUserQuery($id));
 
 ## CQRS map v2
 
-Runtime discovery and compiled execution share one versioned map model. The serialized shape is:
-
-```php
-[
-    'version' => 2,
-    'commands' => [
-        'handlers' => [
-            Command::class => [
-                'service' => Handler::class,
-                'method' => '__invoke',
-            ],
-        ],
-        'listeners' => [
-            Command::class => [[
-                'service' => Listener::class,
-                'events' => [CommandProcessedEvent::class],
-                'priority' => 100,
-            ]],
-        ],
-        'known' => [
-            Command::class => true,
-        ],
-        'metadata' => [
-            Command::class => [
-                Attribute::class => [
-                    'arguments' => ['value'],
-                ],
-            ],
-        ],
-    ],
-    'queries' => [
-        'handlers' => [
-            Query::class => [
-                'service' => QueryHandler::class,
-                'method' => 'handle',
-            ],
-        ],
-    ],
-]
-```
-
-Empty sections are omitted; an empty valid artifact is `['version' => 2]`. Serialization is deterministic. Conflicting handlers or metadata fail instead of silently overriding each other.
+Runtime discovery and compiled execution share one versioned map model. The map contains command handlers/listeners/known commands/metadata and query handlers. Empty sections are omitted; an empty valid artifact is `['version' => 2]`. Serialization is deterministic and conflicting handlers or metadata fail instead of silently overriding each other.
 
 ### Environment behavior
 
@@ -164,7 +115,9 @@ $metadata->get($command, Attribute::class);
 $metadata->isKnown($command);
 ```
 
-The default compiled provider reads registered attributes from the active CQRS map. Reflection fallback is used only for commands that are not known by that map. Optional packages append their metadata attribute classes through `ConfigKey::COMMAND_METADATA_ATTRIBUTES` so `componenta/cqrs-app` can discover and compile them.
+The default provider is strictly map-backed: metadata absent from the active CQRS map is absent at runtime in every environment. There is no implicit reflection fallback. This keeps development discovery, compiled production, workers, and manually constructed containers on the same metadata contract.
+
+`ReflectionCommandMetadataProvider` remains available as an explicit opt-in implementation for applications that deliberately want reflection-based metadata. Optional packages append their metadata attribute classes through `ConfigKey::COMMAND_METADATA_ATTRIBUTES` so `componenta/cqrs-app` can discover and compile them.
 
 ## Discovery attributes
 
