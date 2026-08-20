@@ -66,7 +66,7 @@ public function execute(
 
 В core находится `EventMiddleware`; `HandleCommandHandler` является terminal operation handler и подключается bus factory отдельно.
 
-Порядок middleware является частью поведения. В частности, если одновременно используются retry и transaction middleware, retry должен оборачивать transaction middleware, чтобы каждая попытка имела собственную transaction boundary.
+Порядок middleware является частью поведения. Жёсткие cross-package требования могут объявляться через `#[MiddlewareOrder(before: [...], after: [...])]`; `CommandBus` проверяет их до компиляции pipeline. Поэтому ручное создание bus и DI/compiled container используют одинаковые правила. Дополнительные пакеты применяют это, например, для инвариантов retry снаружи transaction и policy до async transport.
 
 ## Command lifecycle events
 
@@ -117,7 +117,9 @@ $metadata->get($command, Attribute::class);
 $metadata->isKnown($command);
 ```
 
-Стандартный compiled provider читает зарегистрированные attributes из активной CQRS map. Reflection fallback используется только для команд, неизвестных карте. Дополнительные пакеты регистрируют свои metadata attributes через `ConfigKey::COMMAND_METADATA_ATTRIBUTES`, чтобы `componenta/cqrs-app` обнаруживал и компилировал их.
+Стандартный provider теперь строго map-backed: metadata, которой нет в активной CQRS map, отсутствует и в runtime во всех окружениях. Неявного reflection fallback больше нет. Это выравнивает development discovery, compiled production, workers и вручную собранные containers.
+
+`ReflectionCommandMetadataProvider` остаётся доступным как явная opt-in реализация для приложений, которым осознанно нужна reflection metadata. Дополнительные пакеты регистрируют свои metadata attributes через `ConfigKey::COMMAND_METADATA_ATTRIBUTES`, чтобы `componenta/cqrs-app` обнаруживал и компилировал их.
 
 ## Discovery attributes
 
