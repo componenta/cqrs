@@ -70,29 +70,29 @@ public function execute(
 
 `HandleCommandHandler` is the terminal handler. `EventMiddleware` provides command lifecycle events.
 
-### Hard ordering constraints
+### Middleware order
 
-`#[Componenta\CQRS\Command\Middleware\MiddlewareOrder]` exists only for relative order that is a correctness or security invariant. It is not a generic priority system.
+Middleware execute exactly in the order supplied by application configuration. `CommandBus` validates the middleware collection and compiles that order; it does not infer, reorder, or reject application topology based on other packages.
 
-```php
-#[MiddlewareOrder(
-    before: [TransactionMiddleware::class],
-    after: [PolicyMiddleware::class],
-)]
-final class ExampleMiddleware implements MiddlewareInterface
-{
-}
+The order is therefore part of application behavior. For example, with retry and transaction middleware:
+
+```text
+RetryMiddleware
+  TransactionMiddleware
+    handler
 ```
 
-`CommandBus` validates these constraints before compiling the pipeline. Missing target middleware are ignored; when both types are present, an invalid order fails immediately. Manual construction and DI/compiled construction therefore use the same ordering contract.
+creates a new transaction for each retry attempt, while:
 
-Current companion packages use hard ordering for cases such as:
+```text
+TransactionMiddleware
+  RetryMiddleware
+    handler
+```
 
-- authorization before command side effects and async enqueue;
-- async transport before execution-only middleware on the producer side;
-- retry outside transaction so every attempt gets its own transaction boundary.
+keeps all retry attempts inside one surrounding transaction. Neither topology is rejected by CQRS core; applications choose the semantics they need.
 
-Other relative ordering remains application-defined.
+Optional package documentation describes useful ordering patterns and their consequences, but ordering remains configuration responsibility.
 
 ## Command lifecycle events
 
@@ -102,7 +102,7 @@ Other relative ordering remains application-defined.
 - `CommandProcessedEvent` after success;
 - `CommandFailedEvent` after failure before rethrow.
 
-Listener failures propagate by default. When command policy middleware is present, lifecycle events are ordered after authorization.
+Listener failures propagate by default. The position of `EventMiddleware` relative to policy, transport, retry, lock, transaction, or custom middleware is application-defined.
 
 ## Queries
 
