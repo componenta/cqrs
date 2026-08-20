@@ -22,6 +22,7 @@
     },
     "require-dev": {
         "pestphp/pest": "^4.0",
+        "phpbench/phpbench": "^1.7",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.0"
     },
@@ -54,6 +55,7 @@
     },
     "scripts": {
         "test": "@php vendor/bin/pest",
-        "analyse": "@php vendor/bin/phpstan analyse src --level=max"
+        "analyse": "@php vendor/bin/phpstan analyse src --level=max",
+        "bench": "@php vendor/bin/phpbench run benchmarks"
     }
 }
