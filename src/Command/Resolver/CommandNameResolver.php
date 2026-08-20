@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Command\Resolver;
 
 use Componenta\CQRS\Command\NamedCommandInterface;
@@ -13,6 +15,8 @@ final class CommandNameResolver implements CommandNameResolverInterface
 
     public function resolve(object $command): string
     {
-        return $command instanceof NamedCommandInterface ? $command->commandName : $command::class;
+        return $command instanceof NamedCommandInterface
+            ? $command->commandName
+            : $command::class;
     }
 }
