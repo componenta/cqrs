@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Componenta\Config\Config;
 use Componenta\CQRS\Command\Factory\CommandMetadataProviderFactory;
-use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
 use Componenta\CQRS\Command\Metadata\CompiledCommandMetadataProvider;
+use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Map\ConfigCqrsMapProvider;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
@@ -33,27 +33,6 @@ final readonly class CqrsCompiledAnnotatedCommand
 
 final readonly class CqrsCompiledPlainCommand
 {
-}
-
-final class CqrsCountingCommandMetadataProvider implements CommandMetadataProviderInterface
-{
-    public int $calls = 0;
-
-    public function __construct(private readonly ?object $metadata = null)
-    {
-    }
-
-    public function get(object|string $command, string $attribute): ?object
-    {
-        ++$this->calls;
-
-        return $this->metadata;
-    }
-
-    public function isKnown(object|string $command): bool
-    {
-        return false;
-    }
 }
 
 function compiledCommandMetadataMapProviderForTests(): CqrsMapProviderInterface
@@ -102,26 +81,31 @@ describe('Command metadata provider', function (): void {
             ->and($provider->isKnown(CqrsCompiledAnnotatedCommand::class))->toBeTrue();
     });
 
-    it('does not call reflection fallback for a known command without metadata', function (): void {
-        $fallback = new CqrsCountingCommandMetadataProvider(
-            new CqrsCompiledMetadata('fallback'),
-        );
+    it('returns null for a known command without compiled metadata', function (): void {
         $provider = new CompiledCommandMetadataProvider(
             compiledCommandMetadataMapProviderForTests(),
-            $fallback,
         );
 
         expect($provider->get(
             CqrsCompiledPlainCommand::class,
             CqrsCompiledMetadata::class,
-        ))->toBeNull()
-            ->and($fallback->calls)->toBe(0);
+        ))->toBeNull();
     });
 
-    it('uses reflection fallback only for commands outside the compiled map', function (): void {
+    it('does not reflect metadata for a command outside the active map', function (): void {
         $provider = new CompiledCommandMetadataProvider(
             compiledCommandMetadataMapProviderForTests(),
         );
+
+        expect($provider->get(
+            CqrsCompiledUnknownCommand::class,
+            CqrsCompiledMetadata::class,
+        ))->toBeNull()
+            ->and($provider->isKnown(CqrsCompiledUnknownCommand::class))->toBeFalse();
+    });
+
+    it('keeps reflection metadata available as an explicit opt-in provider', function (): void {
+        $provider = new ReflectionCommandMetadataProvider();
 
         $metadata = $provider->get(
             CqrsCompiledUnknownCommand::class,
@@ -131,7 +115,7 @@ describe('Command metadata provider', function (): void {
         expect($metadata)->toBeInstanceOf(CqrsCompiledMetadata::class)
             ->and($metadata->transport)->toBe('reflection')
             ->and($metadata->delay)->toBe(9)
-            ->and($provider->isKnown(CqrsCompiledUnknownCommand::class))->toBeFalse();
+            ->and($provider->isKnown(CqrsCompiledUnknownCommand::class))->toBeTrue();
     });
 
     it('rejects metadata classes that are not PHP attributes', function (): void {
