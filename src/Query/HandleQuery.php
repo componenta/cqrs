@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query;
 
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
@@ -10,14 +12,15 @@ final readonly class HandleQuery
 {
     public function __construct(
         private QueryHandlerLocatorInterface $locator,
-        private CallableInvokerInterface     $invoker = new CallableInvoker
+        private CallableInvokerInterface $invoker = new CallableInvoker(),
     ) {
     }
 
     public function __invoke(object $query): mixed
     {
         return $this->invoker->call(
-            $this->locator->locateFor($query), [$query]
+            $this->locator->locateFor($query),
+            [$query],
         );
     }
 }
