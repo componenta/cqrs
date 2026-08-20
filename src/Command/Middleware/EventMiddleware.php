@@ -13,7 +13,7 @@ use Componenta\CQRS\Command\OperationInterface;
 use Throwable;
 
 /** Dispatches command lifecycle events after authorization middleware. */
-#[MiddlewareOrder(after: [PolicyMiddleware::class])]
+#[MiddlewareOrder(after: ['Componenta\\CQRS\\Command\\Middleware\\PolicyMiddleware'])]
 final readonly class EventMiddleware implements MiddlewareInterface
 {
     /**
