@@ -2,7 +2,7 @@
 
 `componenta/cqrs` is the neutral CQRS runtime for PHP 8.4+. It provides command and query buses, immutable command operations, middleware contracts, handler/listener locators, command lifecycle events, metadata access, and the versioned CQRS map consumed by application tooling.
 
-Optional policy, retry, locking, transactions, async transport, workers, and application discovery live in separate packages.
+`main` is the CQRS v4 line. Optional policy, retry, locking, transactions, async transport, workers, and application discovery live in separate packages.
 
 ## Installation
 
@@ -36,7 +36,24 @@ $result = $operation->result?->value;
 
 `CommandBusInterface::dispatch(object $command, array $attributes = [])` creates one `OperationInterface` and sends that operation through the complete configured command pipeline.
 
-The operation contains a UUID v7 operation ID, the command instance, timestamp, operation attributes, and an `OperationResult` after synchronous completion. One command dispatch corresponds to one operation.
+One command dispatch corresponds to one operation. Operation attributes are a strict `array<string,mixed>` contract: empty, integer, and numeric-string names that PHP would coerce to integer keys are rejected.
+
+### Direct construction
+
+CQRS v4 keeps the operation factory separate from middleware composition:
+
+```php
+$bus = new Componenta\CQRS\Command\CommandBus(
+    commandHandler: $terminalHandler,
+    middlewares: [
+        $firstMiddleware,
+        $secondMiddleware,
+    ],
+    operationFactory: $operationFactory,
+);
+```
+
+The operation factory is optional; `OperationFactory` is used by default.
 
 ### Dispatching multiple commands
 
@@ -68,7 +85,24 @@ public function execute(
 
 The core runtime contains `EventMiddleware`; `HandleCommandHandler` is the terminal operation handler and is wired separately by the bus factory.
 
-Middleware order is behavior. Hard cross-package requirements can be declared with `#[MiddlewareOrder(before: [...], after: [...])]`; `CommandBus` validates them before compiling the pipeline, so manual construction and DI-created buses use the same rules. Optional packages use this for invariants such as retry outside transaction and policy before async transport.
+### Hard ordering constraints
+
+CQRS v4 provides `#[Componenta\CQRS\Command\Middleware\MiddlewareOrder]` for middleware whose relative position is a correctness or security invariant:
+
+```php
+#[MiddlewareOrder(
+    before: [TransactionMiddleware::class],
+    after: [PolicyMiddleware::class],
+)]
+final class ExampleMiddleware implements MiddlewareInterface
+{
+    // ...
+}
+```
+
+`CommandBus` validates these constraints **before** compiling the pipeline. A referenced middleware type that is not present is ignored; when both middleware are present, an invalid order fails immediately. This applies equally to manually constructed buses and buses created by `CommandBusFactory`, so DI/compiled execution cannot silently use a different ordering contract.
+
+Companion packages use this mechanism for the security-sensitive boundaries in the current generation: policy before execution side effects, transport before execution-only middleware on the async producer side, and retry before transaction.
 
 ## Command lifecycle events
 
@@ -78,7 +112,7 @@ Middleware order is behavior. Hard cross-package requirements can be declared wi
 - `CommandProcessedEvent` after successful execution;
 - `CommandFailedEvent` after failure before the exception is rethrown.
 
-Listener failures propagate by default. An explicitly constructed `EventMiddleware` may suppress listener-body exceptions only; locator, map, and DI failures still propagate.
+Listener failures propagate by default. An explicitly constructed `EventMiddleware` may suppress listener-body exceptions only; locator, map, and DI failures still propagate. When the official command policy middleware is present, `EventMiddleware` declares a hard order requiring policy evaluation first.
 
 ## Queries
 
@@ -88,11 +122,52 @@ Queries represent read use cases:
 $result = $queries->handle(new GetUserQuery($id));
 ```
 
-`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` normalizes array context to immutable `Context` before invoking query middleware.
+`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` normalizes array context to immutable `Context` before invoking query middleware. Query context attributes obey the same non-empty string-key invariant as operation attributes.
 
 ## CQRS map v2
 
-Runtime discovery and compiled execution share one versioned map model. The map contains command handlers/listeners/known commands/metadata and query handlers. Empty sections are omitted; an empty valid artifact is `['version' => 2]`. Serialization is deterministic and conflicting handlers or metadata fail instead of silently overriding each other.
+Runtime discovery and compiled execution share one versioned map model. The serialized shape is:
+
+```php
+[
+    'version' => 2,
+    'commands' => [
+        'handlers' => [
+            Command::class => [
+                'service' => Handler::class,
+                'method' => '__invoke',
+            ],
+        ],
+        'listeners' => [
+            Command::class => [[
+                'service' => Listener::class,
+                'events' => [CommandProcessedEvent::class],
+                'priority' => 100,
+            ]],
+        ],
+        'known' => [
+            Command::class => true,
+        ],
+        'metadata' => [
+            Command::class => [
+                Attribute::class => [
+                    'arguments' => ['value'],
+                ],
+            ],
+        ],
+    ],
+    'queries' => [
+        'handlers' => [
+            Query::class => [
+                'service' => QueryHandler::class,
+                'method' => 'handle',
+            ],
+        ],
+    ],
+]
+```
+
+Empty sections are omitted; an empty valid artifact is `['version' => 2]`. Serialization is deterministic. Conflicting handlers or metadata fail instead of silently overriding each other.
 
 ### Environment behavior
 
@@ -115,9 +190,11 @@ $metadata->get($command, Attribute::class);
 $metadata->isKnown($command);
 ```
 
-The default provider is strictly map-backed: metadata absent from the active CQRS map is absent at runtime in every environment. There is no implicit reflection fallback. This keeps development discovery, compiled production, workers, and manually constructed containers on the same metadata contract.
+CQRS v4's standard `CompiledCommandMetadataProvider` is strictly map-backed. If a metadata descriptor is absent from the active map, `get()` returns `null`; it does not inspect the command class as a fallback. This keeps discovery/compiled semantics explicit and prevents metadata from appearing only because a class happens to exist at runtime.
 
-`ReflectionCommandMetadataProvider` remains available as an explicit opt-in implementation for applications that deliberately want reflection-based metadata. Optional packages append their metadata attribute classes through `ConfigKey::COMMAND_METADATA_ATTRIBUTES` so `componenta/cqrs-app` can discover and compile them.
+`ReflectionCommandMetadataProvider` remains available as an explicit alternative implementation for applications that deliberately choose reflection semantics. Binding it is an opt-in runtime contract, not an automatic fallback of the compiled provider.
+
+Optional packages append their metadata attribute classes through `ConfigKey::COMMAND_METADATA_ATTRIBUTES` so `componenta/cqrs-app` can discover them into the development map and compile the same descriptors for non-development execution.
 
 ## Discovery attributes
 
@@ -149,6 +226,7 @@ Handler discovery requires the message in the first parameter slot. Additional r
 - `CommandBusInterface` / `QueryBusInterface` for alternate buses or decorators;
 - `OperationFactoryInterface` for custom operation construction;
 - command/query `MiddlewareInterface` for cross-cutting execution behavior;
+- `MiddlewareOrder` for hard command-middleware ordering invariants;
 - `CommandNameResolverInterface` / `QueryNameResolverInterface` for custom message names;
 - locator interfaces for alternate handler/listener resolution;
 - `CommandMetadataProviderInterface` for alternate metadata sources;
@@ -159,6 +237,7 @@ Handler discovery requires the message in the first parameter slot. Additional r
 ```bash
 composer test
 composer analyse
+composer bench
 ```
 
-The package CI verifies PHP 8.4 and 8.5 and runs both the test suite and PHPStan at maximum level.
+The package CI verifies PHP 8.4 and 8.5 and runs both the test suite and PHPStan at maximum level. The test suite also executes benchmark setup as a lightweight compatibility check; `composer bench` runs the actual PhpBench workload.
