@@ -6,6 +6,7 @@ namespace Componenta\CQRS\Command;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use InvalidArgumentException;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 
@@ -19,6 +20,7 @@ final readonly class Operation implements OperationInterface
         private(set) array $attributes = [],
         public ?OperationResult $result = null,
     ) {
+        self::assertAttributes($attributes);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -60,6 +62,8 @@ final readonly class Operation implements OperationInterface
 
     public function withAttribute(string $name, mixed $value): OperationInterface
     {
+        self::assertAttributeName($name);
+
         return new self(
             id: $this->id,
             command: $this->command,
@@ -71,6 +75,8 @@ final readonly class Operation implements OperationInterface
 
     public function withoutAttribute(string $name): OperationInterface
     {
+        self::assertAttributeName($name);
+
         $attributes = $this->attributes;
         unset($attributes[$name]);
 
@@ -81,5 +87,33 @@ final readonly class Operation implements OperationInterface
             attributes: $attributes,
             result: $this->result,
         );
+    }
+
+    /** @param array<array-key, mixed> $attributes */
+    private static function assertAttributes(array $attributes): void
+    {
+        foreach ($attributes as $name => $_) {
+            if (!is_string($name) || trim($name) === '') {
+                throw new InvalidArgumentException(
+                    'Operation attribute names must be non-empty strings.',
+                );
+            }
+        }
+    }
+
+    private static function assertAttributeName(string $name): void
+    {
+        if (trim($name) === '') {
+            throw new InvalidArgumentException(
+                'Operation attribute name must be a non-empty string.',
+            );
+        }
+
+        if (!is_string(array_key_first([$name => true]))) {
+            throw new InvalidArgumentException(sprintf(
+                'Operation attribute name "%s" is converted by PHP to an integer array key.',
+                $name,
+            ));
+        }
     }
 }
