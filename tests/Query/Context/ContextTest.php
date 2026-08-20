@@ -65,3 +65,21 @@ it('withoutAttribute on a missing key returns an equivalent instance', function 
 
     expect($ctx->attributes)->toBe(['a' => 1]);
 });
+
+it('rejects constructor attributes with non-string or empty names', function (array $attributes): void {
+    expect(fn() => new Context($attributes))
+        ->toThrow(InvalidArgumentException::class, 'non-empty strings');
+})->with([
+    'integer key' => [[0 => 'value']],
+    'empty string' => [['' => 'value']],
+    'whitespace string' => [['   ' => 'value']],
+]);
+
+it('rejects names that PHP converts to integer keys in named context operations', function (): void {
+    $context = new Context();
+
+    expect(fn() => $context->withAttribute('0', 'value'))
+        ->toThrow(InvalidArgumentException::class, 'integer array key')
+        ->and(fn() => $context->withoutAttribute('0'))
+        ->toThrow(InvalidArgumentException::class, 'integer array key');
+});
