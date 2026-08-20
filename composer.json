@@ -43,6 +43,9 @@
     },
     "minimum-stability": "stable",
     "extra": {
+        "branch-alias": {
+            "dev-main": "4.0.x-dev"
+        },
         "componenta": {
             "config-providers": [
                 "Componenta\\CQRS\\ConfigProvider"
