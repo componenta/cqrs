@@ -80,6 +80,10 @@ final readonly class CommandMetadataDescriptor
             return false;
         }
 
+        if (is_float($left)) {
+            return is_float($right) && pack('E', $left) === pack('E', $right);
+        }
+
         if (is_array($left)) {
             if (!is_array($right) || array_keys($left) !== array_keys($right)) {
                 return false;
