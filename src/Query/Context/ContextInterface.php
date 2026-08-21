@@ -22,7 +22,7 @@ interface ContextInterface
     public function withAttribute(string $name, mixed $value): static;
 
     /**
-     * @param array<string, mixed> $attributes Merged on top of the existing attributes.
+     * @param array<string, mixed> $attributes Complete replacement attributes.
      */
     public function withAttributes(array $attributes): static;
 
