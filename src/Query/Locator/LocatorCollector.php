@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query\Locator;
 
-final class LocatorCollector implements QueryHandlerLocatorInterface
+final readonly class LocatorCollector implements QueryHandlerLocatorInterface
 {
-    /** @var array<QueryHandlerLocatorInterface&QuerySupportAwareInterface> */
+    /** @var list<QueryHandlerLocatorInterface&QuerySupportAwareInterface> */
     private array $locators;
 
     public function __construct(
         private QueryHandlerLocatorInterface $fallback,
-        QueryHandlerLocatorInterface&QuerySupportAwareInterface ...$locators
+        QueryHandlerLocatorInterface&QuerySupportAwareInterface ...$locators,
     ) {
-        $this->locators = $locators;
+        $this->locators = array_values($locators);
     }
 
     public function locateFor(object $query): callable
