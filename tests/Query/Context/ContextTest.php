@@ -45,10 +45,10 @@ it('withAttribute overrides an existing key', function () {
     expect($ctx->getAttribute('a'))->toBe(99);
 });
 
-it('withAttributes merges on top of existing attributes', function () {
+it('withAttributes replaces existing attributes', function () {
     $ctx = (new Context(['a' => 1, 'b' => 2]))->withAttributes(['b' => 20, 'c' => 3]);
 
-    expect($ctx->attributes)->toBe(['a' => 1, 'b' => 20, 'c' => 3]);
+    expect($ctx->attributes)->toBe(['b' => 20, 'c' => 3]);
 });
 
 it('withoutAttribute removes a key, returning a new instance', function () {
