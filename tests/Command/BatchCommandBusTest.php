@@ -97,3 +97,24 @@ it('allows duplicate command classes and applies class attributes to each comman
             $inner->operations[1],
         ]);
 });
+
+it('rejects malformed selected attributes before dispatching any command', function (array $invalidAttributes): void {
+    $inner = new RecordingBatchCommandBus();
+    $bus = new BatchCommandBus($inner);
+
+    expect(fn() => $bus->dispatchMany(
+        [
+            new BatchCommandBusFirstCommand('one'),
+            new BatchCommandBusSecondCommand('two'),
+        ],
+        [
+            BatchCommandBusFirstCommand::class => ['trace_id' => 'trace-1'],
+            BatchCommandBusSecondCommand::class => $invalidAttributes,
+        ],
+    ))->toThrow(InvalidArgumentException::class, 'non-empty string names')
+        ->and($inner->operations)->toBe([]);
+})->with([
+    'integer key' => [[0 => 'value']],
+    'empty string' => [['' => 'value']],
+    'whitespace string' => [['   ' => 'value']],
+]);
