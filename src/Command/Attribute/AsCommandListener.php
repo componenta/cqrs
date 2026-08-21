@@ -22,6 +22,12 @@ final readonly class AsCommandListener
         public int $priority = 0,
         public array $eventTypes = [],
     ) {
+        if (trim($this->command) === '') {
+            throw new InvalidArgumentException(
+                'CQRS command listener command name cannot be empty or whitespace.',
+            );
+        }
+
         self::assertEventTypes($this->eventTypes);
     }
 
@@ -38,10 +44,10 @@ final readonly class AsCommandListener
         ];
 
         foreach ($eventTypes as $eventType) {
-            if (!\in_array($eventType, $supported, true)) {
+            if (!is_string($eventType) || !\in_array($eventType, $supported, true)) {
                 throw new InvalidArgumentException(sprintf(
                     'Event type "%s" is not supported. Supported types: %s.',
-                    $eventType,
+                    is_string($eventType) ? $eventType : get_debug_type($eventType),
                     implode(', ', $supported),
                 ));
             }
