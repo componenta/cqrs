@@ -19,6 +19,21 @@ it('preserves valid string operation attribute keys', function (): void {
     ]);
 });
 
+it('withAttributes replaces existing operation attributes', function (): void {
+    $operation = Operation::create(new stdClass(), [
+        'a' => 1,
+        'b' => 2,
+    ])->withAttributes([
+        'b' => 20,
+        'c' => 3,
+    ]);
+
+    expect($operation->attributes)->toBe([
+        'b' => 20,
+        'c' => 3,
+    ]);
+});
+
 it('uses createdAt for operation creation time and preserves it across immutable copies', function (): void {
     $operation = Operation::create(new stdClass());
     $createdAt = $operation->createdAt;
