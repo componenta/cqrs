@@ -68,7 +68,7 @@ public function execute(
 ): OperationInterface;
 ```
 
-`HandleCommandHandler` is the terminal handler. `EventMiddleware` provides command lifecycle events.
+`HandleCommandHandler` is the terminal handler. `ConfigProvider` registers `EventMiddleware` as a service, but does not insert it into the pipeline automatically. Add it to `ConfigKey::COMMAND_MIDDLEWARES` when command lifecycle listeners should run.
 
 ### Middleware order
 
@@ -120,7 +120,7 @@ Runtime discovery and compiled execution use one versioned CQRS map model. An em
 ['version' => 2]
 ```
 
-Only exact `APP_ENV=development` may use the live discovery overlay from `componenta/cqrs-app`. Every other environment, including `production`, `staging`, and `test`, is compiled-only and requires a current map artifact.
+The application environment defaults to development when `APP_ENV` is absent. Therefore a missing `APP_ENV` or explicit `APP_ENV=development` may use the live discovery overlay from `componenta/cqrs-app`. Any explicit non-development environment, including `production`, `staging`, and `test`, is compiled-only and requires a current map artifact.
 
 Build it from development discovery:
 
