@@ -25,6 +25,38 @@ it('treats separately materialized equivalent metadata objects as equal', functi
     expect($left->equals($right))->toBeTrue();
 });
 
+it('treats named constructor arguments as order-independent', function (): void {
+    $left = new CommandMetadataDescriptor('Meta', [
+        'first' => 1,
+        'second' => 2,
+    ]);
+    $right = new CommandMetadataDescriptor('Meta', [
+        'second' => 2,
+        'first' => 1,
+    ]);
+
+    expect($left->equals($right))->toBeTrue();
+});
+
+it('keeps positional argument order and nested array order significant', function (): void {
+    $base = new CommandMetadataDescriptor('Meta', [
+        0 => 'first',
+        1 => 'second',
+        'options' => ['a' => 1, 'b' => 2],
+    ]);
+
+    expect($base->equals(new CommandMetadataDescriptor('Meta', [
+        0 => 'second',
+        1 => 'first',
+        'options' => ['a' => 1, 'b' => 2],
+    ])))->toBeFalse()
+        ->and($base->equals(new CommandMetadataDescriptor('Meta', [
+            0 => 'first',
+            1 => 'second',
+            'options' => ['b' => 2, 'a' => 1],
+        ])))->toBeFalse();
+});
+
 it('keeps exact scalar types, float bits, and object state when comparing metadata', function (): void {
     $base = new CommandMetadataDescriptor('Meta', [
         'value' => new MetadataObjectValue(1),
