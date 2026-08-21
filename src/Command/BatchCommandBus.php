@@ -51,6 +51,7 @@ final readonly class BatchCommandBus implements CommandBusInterface
                 ));
             }
 
+            self::assertAttributes($commandClass, $commandAttributes);
             $batch[] = [$command, $commandAttributes];
         }
 
@@ -61,5 +62,18 @@ final readonly class BatchCommandBus implements CommandBusInterface
         }
 
         return $operations;
+    }
+
+    /** @param array<array-key, mixed> $attributes */
+    private static function assertAttributes(string $commandClass, array $attributes): void
+    {
+        foreach ($attributes as $name => $_) {
+            if (!is_string($name) || trim($name) === '') {
+                throw new InvalidArgumentException(sprintf(
+                    'Attributes for command "%s" must use non-empty string names.',
+                    $commandClass,
+                ));
+            }
+        }
     }
 }
