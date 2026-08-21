@@ -10,11 +10,11 @@ use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
 use InvalidArgumentException;
 
-#[Attribute(Attribute::TARGET_CLASS|Attribute::IS_REPEATABLE)]
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
 final readonly class AsCommandListener
 {
     /**
-     * @param class-string $command
+     * @param non-empty-string $command Command class or logical command name.
      * @param list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes
      */
     public function __construct(
@@ -32,11 +32,15 @@ final readonly class AsCommandListener
     }
 
     /**
-     * @param list<string> $eventTypes
+     * @param array<array-key, mixed> $eventTypes
      * @throws InvalidArgumentException
      */
     public static function assertEventTypes(array $eventTypes): void
     {
+        if (!array_is_list($eventTypes)) {
+            throw new InvalidArgumentException('CQRS command listener event types must be a list.');
+        }
+
         $supported = [
             CommandProcessEvent::class,
             CommandProcessedEvent::class,
