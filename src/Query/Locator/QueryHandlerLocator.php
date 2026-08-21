@@ -15,9 +15,6 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
 {
     use QueryNameResolution;
 
-    /** @var array<string, callable> */
-    private array $resolvedHandlers = [];
-
     public function __construct(
         private readonly CqrsMapProviderInterface $mapProvider,
         private readonly ContainerInterface $container,
@@ -29,11 +26,6 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
     public function locateFor(object $query): callable
     {
         $queryName = $this->resolveQueryName($query);
-
-        if (isset($this->resolvedHandlers[$queryName])) {
-            return $this->resolvedHandlers[$queryName];
-        }
-
         $descriptor = $this->mapProvider->map()->queryHandler($queryName);
 
         if ($descriptor === null) {
@@ -50,17 +42,19 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
                 );
             }
 
-            return $this->resolvedHandlers[$queryName] = $handler;
+            return $handler;
         }
 
-        if (!is_callable([$handler, $descriptor->method])) {
+        $callable = [$handler, $descriptor->method];
+
+        if (!is_callable($callable)) {
             throw InvalidHandlerException::serviceMethodNotCallable(
                 $descriptor->service,
                 $descriptor->method,
             );
         }
 
-        return $this->resolvedHandlers[$queryName] = $handler->{$descriptor->method}(...);
+        return $callable;
     }
 
     public function supports(object $query): bool
