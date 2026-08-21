@@ -68,7 +68,7 @@ public function execute(
 ): OperationInterface;
 ```
 
-`HandleCommandHandler` является terminal handler. `EventMiddleware` предоставляет lifecycle events команды.
+`HandleCommandHandler` является terminal handler. `ConfigProvider` регистрирует `EventMiddleware` как сервис, но не добавляет его в pipeline автоматически. Добавьте его в `ConfigKey::COMMAND_MIDDLEWARES`, если должны выполняться command lifecycle listeners.
 
 ### Порядок middleware
 
@@ -120,7 +120,7 @@ Runtime discovery и compiled execution используют одну versioned 
 ['version' => 2]
 ```
 
-Только точное `APP_ENV=development` может использовать live discovery overlay из `componenta/cqrs-app`. Любое другое окружение, включая `production`, `staging` и `test`, является compiled-only и требует актуальный map artifact.
+Если `APP_ENV` отсутствует, окружение по умолчанию считается development. Поэтому отсутствующий `APP_ENV` или явный `APP_ENV=development` может использовать live discovery overlay из `componenta/cqrs-app`. Любое явно заданное non-development окружение, включая `production`, `staging` и `test`, является compiled-only и требует актуальный map artifact.
 
 Сборка:
 
