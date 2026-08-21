@@ -55,14 +55,75 @@ final readonly class CommandMetadataDescriptor
 
     public function equals(self $other): bool
     {
+        if ($this->attribute !== $other->attribute) {
+            return false;
+        }
+
         $seenObjects = [];
 
-        return $this->attribute === $other->attribute
-            && self::valuesEquivalent(
-                $this->arguments,
-                $other->arguments,
-                $seenObjects,
-            );
+        return self::argumentsEquivalent(
+            $this->arguments,
+            $other->arguments,
+            $seenObjects,
+        );
+    }
+
+    /**
+     * Constructor positional arguments are order-sensitive while named
+     * arguments are keyed by parameter name and therefore order-independent.
+     * Nested arrays remain ordinary user values and preserve their key order.
+     *
+     * @param array<int|string, mixed> $left
+     * @param array<int|string, mixed> $right
+     * @param array<string, true> $seenObjects
+     */
+    private static function argumentsEquivalent(
+        array $left,
+        array $right,
+        array &$seenObjects,
+    ): bool {
+        $leftPositional = [];
+        $rightPositional = [];
+        $leftNamed = [];
+        $rightNamed = [];
+
+        foreach ($left as $key => $value) {
+            if (is_int($key)) {
+                $leftPositional[$key] = $value;
+            } else {
+                $leftNamed[$key] = $value;
+            }
+        }
+
+        foreach ($right as $key => $value) {
+            if (is_int($key)) {
+                $rightPositional[$key] = $value;
+            } else {
+                $rightNamed[$key] = $value;
+            }
+        }
+
+        if (array_keys($leftPositional) !== array_keys($rightPositional)
+            || count($leftNamed) !== count($rightNamed)
+        ) {
+            return false;
+        }
+
+        foreach ($leftPositional as $key => $value) {
+            if (!self::valuesEquivalent($value, $rightPositional[$key], $seenObjects, 1)) {
+                return false;
+            }
+        }
+
+        foreach ($leftNamed as $name => $value) {
+            if (!array_key_exists($name, $rightNamed)
+                || !self::valuesEquivalent($value, $rightNamed[$name], $seenObjects, 1)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
