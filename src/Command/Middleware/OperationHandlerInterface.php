@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Command\Middleware;
 
 use Componenta\CQRS\Command\OperationInterface;
 
 interface OperationHandlerInterface
 {
-    public function handle(OperationInterface $operation): OperationInterface ;
+    public function handle(OperationInterface $operation): OperationInterface;
 }
