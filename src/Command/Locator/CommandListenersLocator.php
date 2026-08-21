@@ -17,9 +17,6 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
 {
     use CommandNameResolution;
 
-    /** @var array<string, CommandListenerInterface> */
-    private array $resolvedListeners = [];
-
     public function __construct(
         private readonly CqrsMapProviderInterface $mapProvider,
         private readonly ContainerInterface $container,
@@ -41,11 +38,6 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
                 continue;
             }
 
-            if (isset($this->resolvedListeners[$descriptor->service])) {
-                yield $this->resolvedListeners[$descriptor->service];
-                continue;
-            }
-
             $listener = $this->container->get($descriptor->service);
 
             if (!$listener instanceof CommandListenerInterface) {
@@ -54,8 +46,6 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
                     get_debug_type($listener),
                 );
             }
-
-            $this->resolvedListeners[$descriptor->service] = $listener;
 
             yield $listener;
         }
