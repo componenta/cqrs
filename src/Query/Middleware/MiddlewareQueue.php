@@ -5,25 +5,21 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Query\Middleware;
 
 use Componenta\CQRS\Query\Context\ContextInterface;
-use Componenta\Stdlib\ArrayListReverseIterator;
 
-final class MiddlewareQueue implements MiddlewareInterface
+final readonly class MiddlewareQueue implements MiddlewareInterface
 {
-    /** @var ArrayListReverseIterator<MiddlewareInterface> */
-    private readonly ArrayListReverseIterator $queue;
+    /** @var list<MiddlewareInterface> */
+    private array $middlewares;
 
-    public function __construct(
-        MiddlewareInterface ...$middlewares
-    ) {
-        $this->queue = new ArrayListReverseIterator(array_values($middlewares));
+    public function __construct(MiddlewareInterface ...$middlewares)
+    {
+        $this->middlewares = array_values($middlewares);
     }
 
-    /**
-     * @inheritdoc
-     */
     public function handle(object $query, ContextInterface $context, callable $next): mixed
     {
-        foreach ($this->queue as $middleware) {
+        for ($index = count($this->middlewares) - 1; $index >= 0; --$index) {
+            $middleware = $this->middlewares[$index];
             $next = static fn(object $q, ContextInterface $c): mixed
                 => $middleware->handle($q, $c, $next);
         }
