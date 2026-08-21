@@ -72,7 +72,7 @@ final class RuntimeLocatorTestContainer implements ContainerInterface
     }
 }
 
-it('resolves a handler service and binds its callable only once', function (): void {
+it('resolves a handler service through the container for every locate', function (): void {
     $map = new CqrsMap(commandHandlers: [
         RuntimeLocatorTestCommand::class => new HandlerDescriptor(
             RuntimeLocatorTestHandler::class,
@@ -91,9 +91,9 @@ it('resolves a handler service and binds its callable only once', function (): v
     $first = $locator->locateFor($command);
     $second = $locator->locateFor($command);
 
-    expect($first)->toBe($second)
-        ->and($first($command))->toBe($command)
-        ->and($container->gets)->toBe([RuntimeLocatorTestHandler::class => 1]);
+    expect($first($command))->toBe($command)
+        ->and($second($command))->toBe($command)
+        ->and($container->gets)->toBe([RuntimeLocatorTestHandler::class => 2]);
 });
 
 it('reports invalid mapped handler services with the documented locator exception', function (): void {
@@ -130,7 +130,7 @@ it('reports invalid mapped listener services with a typed locator exception', fu
         ->toThrow(InvalidListenerException::class, 'must implement');
 });
 
-it('filters listener events before container access and memoizes instances by service id', function (): void {
+it('filters listener events before container access and resolves matching descriptors through the container', function (): void {
     $map = new CqrsMap(commandListeners: [
         RuntimeLocatorTestCommand::class => [
             new CommandListenerDescriptor(
@@ -158,5 +158,5 @@ it('filters listener events before container access and memoizes instances by se
     $event = new CommandProcessEvent(Operation::create(new RuntimeLocatorTestCommand()));
 
     expect(iterator_to_array($locator->locateFor($event)))->toBe([$listener, $listener])
-        ->and($container->gets)->toBe(['listener.matching' => 1]);
+        ->and($container->gets)->toBe(['listener.matching' => 2]);
 });
