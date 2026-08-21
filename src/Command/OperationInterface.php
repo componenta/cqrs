@@ -32,7 +32,7 @@ interface OperationInterface
 
     public function withResult(OperationResult $result): OperationInterface;
 
-    /** @param array<string, mixed> $attributes */
+    /** @param array<string, mixed> $attributes Complete replacement attributes. */
     public function withAttributes(array $attributes): OperationInterface;
 
     public function withAttribute(string $name, mixed $value): OperationInterface;
