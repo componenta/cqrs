@@ -7,6 +7,7 @@ use Componenta\CQRS\Command\Event\CommandListenerInterface;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
 use Componenta\CQRS\Command\Exception\InvalidHandlerException;
+use Componenta\CQRS\Command\Exception\InvalidListenerException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Operation;
@@ -111,6 +112,22 @@ it('reports invalid mapped handler services with the documented locator exceptio
         expect(fn() => $locator->locateFor(new RuntimeLocatorTestCommand()))
             ->toThrow(InvalidHandlerException::class, $message);
     }
+});
+
+it('reports invalid mapped listener services with a typed locator exception', function (): void {
+    $map = new CqrsMap(commandListeners: [
+        RuntimeLocatorTestCommand::class => [
+            new CommandListenerDescriptor('invalid.listener'),
+        ],
+    ]);
+    $locator = new CommandListenersLocator(
+        new RuntimeLocatorTestMapProvider($map),
+        new RuntimeLocatorTestContainer(['invalid.listener' => new stdClass()]),
+    );
+    $event = new CommandProcessEvent(Operation::create(new RuntimeLocatorTestCommand()));
+
+    expect(fn() => iterator_to_array($locator->locateFor($event)))
+        ->toThrow(InvalidListenerException::class, 'must implement');
 });
 
 it('filters listener events before container access and memoizes instances by service id', function (): void {
