@@ -8,9 +8,9 @@ use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
+use Componenta\CQRS\Command\Exception\InvalidListenerException;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use LogicException;
 use Psr\Container\ContainerInterface;
 
 final class CommandListenersLocator implements CommandListenersLocatorInterface
@@ -49,12 +49,10 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
             $listener = $this->container->get($descriptor->service);
 
             if (!$listener instanceof CommandListenerInterface) {
-                throw new LogicException(sprintf(
-                    'CQRS listener service "%s" must implement %s; got %s.',
+                throw InvalidListenerException::serviceType(
                     $descriptor->service,
-                    CommandListenerInterface::class,
                     get_debug_type($listener),
-                ));
+                );
             }
 
             $this->resolvedListeners[$descriptor->service] = $listener;
