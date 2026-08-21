@@ -25,19 +25,27 @@ it('treats separately materialized equivalent metadata objects as equal', functi
     expect($left->equals($right))->toBeTrue();
 });
 
-it('keeps exact scalar types and object state when comparing metadata', function (): void {
+it('keeps exact scalar types, float bits, and object state when comparing metadata', function (): void {
     $base = new CommandMetadataDescriptor('Meta', [
         'value' => new MetadataObjectValue(1),
         'number' => 1,
+        'zero' => -0.0,
     ]);
 
     expect($base->equals(new CommandMetadataDescriptor('Meta', [
         'value' => new MetadataObjectValue(2),
         'number' => 1,
+        'zero' => -0.0,
     ])))->toBeFalse()
         ->and($base->equals(new CommandMetadataDescriptor('Meta', [
             'value' => new MetadataObjectValue(1),
             'number' => 1.0,
+            'zero' => -0.0,
+        ])))->toBeFalse()
+        ->and($base->equals(new CommandMetadataDescriptor('Meta', [
+            'value' => new MetadataObjectValue(1),
+            'number' => 1,
+            'zero' => 0.0,
         ])))->toBeFalse();
 });
 
