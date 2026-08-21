@@ -41,9 +41,7 @@ final readonly class Context implements ContextInterface
 
     public function withAttributes(array $attributes): static
     {
-        self::assertAttributes($attributes);
-
-        return new self([...$this->attributes, ...$attributes]);
+        return new self($attributes);
     }
 
     public function withoutAttribute(string $name): static
