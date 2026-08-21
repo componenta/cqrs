@@ -6,9 +6,9 @@ namespace Componenta\CQRS\Query\Locator;
 
 use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\Exception\HandlerNotFoundException;
+use Componenta\CQRS\Query\Exception\InvalidHandlerException;
 use Componenta\CQRS\Query\Resolver\QueryNameResolution;
 use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
-use LogicException;
 use Psr\Container\ContainerInterface;
 
 final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySupportAwareInterface
@@ -44,22 +44,20 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
 
         if ($descriptor->method === '__invoke') {
             if (!is_callable($handler)) {
-                throw new LogicException(sprintf(
-                    'CQRS query handler service "%s" for "%s" is not invokable.',
+                throw InvalidHandlerException::serviceNotInvokable(
                     $descriptor->service,
                     $queryName,
-                ));
+                );
             }
 
             return $this->resolvedHandlers[$queryName] = $handler;
         }
 
         if (!is_callable([$handler, $descriptor->method])) {
-            throw new LogicException(sprintf(
-                'CQRS query handler service "%s" has no public callable method "%s".',
+            throw InvalidHandlerException::serviceMethodNotCallable(
                 $descriptor->service,
                 $descriptor->method,
-            ));
+            );
         }
 
         return $this->resolvedHandlers[$queryName] = $handler->{$descriptor->method}(...);
