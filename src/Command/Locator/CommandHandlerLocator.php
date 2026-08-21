@@ -14,9 +14,6 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
 {
     use CommandNameResolution;
 
-    /** @var array<string, callable> */
-    private array $resolvedHandlers = [];
-
     public function __construct(
         private readonly CqrsMapProviderInterface $mapProvider,
         private readonly ContainerInterface $container,
@@ -36,11 +33,6 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
     public function locateFor(object $command): callable
     {
         $commandName = $this->resolveCommandName($command);
-
-        if (isset($this->resolvedHandlers[$commandName])) {
-            return $this->resolvedHandlers[$commandName];
-        }
-
         $descriptor = $this->mapProvider->map()->commandHandler($commandName);
 
         if ($descriptor === null) {
@@ -57,7 +49,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
                 );
             }
 
-            return $this->resolvedHandlers[$commandName] = $handler;
+            return $handler;
         }
 
         if (!is_callable([$handler, $descriptor->method])) {
@@ -67,7 +59,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
             );
         }
 
-        return $this->resolvedHandlers[$commandName] = $handler->{$descriptor->method}(...);
+        return $handler->{$descriptor->method}(...);
     }
 
     public function supports(object $command): bool
