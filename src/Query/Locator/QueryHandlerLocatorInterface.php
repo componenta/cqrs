@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Componenta\CQRS\Query\Locator;
 
 use Componenta\CQRS\Query\Exception\HandlerNotFoundException;
