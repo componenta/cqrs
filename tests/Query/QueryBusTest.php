@@ -108,3 +108,23 @@ it('propagates exceptions from the terminal query handler', function () {
     expect(fn () => $bus->handle(new FakeQuery('boom')))
         ->toThrow(RuntimeException::class, 'query failed');
 });
+
+it('preserves middleware order with named variadic arguments', function (bool $allNamed): void {
+    $wrap = static fn (string $name): MiddlewareInterface => new readonly class ($name) implements MiddlewareInterface {
+        public function __construct(private string $name)
+        {
+        }
+
+        public function handle(object $query, ContextInterface $context, callable $next): mixed
+        {
+            return $this->name . '(' . $next($query, $context) . ')';
+        }
+    };
+    $outer = $wrap('outer');
+    $inner = $wrap('inner');
+    $bus = $allNamed
+        ? new QueryBus(makeHandleQuery(), z: $outer, a: $inner)
+        : new QueryBus(makeHandleQuery(), $outer, a: $inner);
+
+    expect($bus->handle(new FakeQuery('named')))->toBe('outer(inner(handled:named))');
+})->with(['all named' => true, 'positional then named' => false]);

@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-use Componenta\CQRS\Map\CqrsMap;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use Componenta\CQRS\Map\HandlerDescriptor;
 use Componenta\CQRS\Query\Exception\InvalidHandlerException;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Psr\Container\ContainerInterface;
@@ -21,23 +18,15 @@ final class QueryRuntimeLocatorTestHandler
     }
 }
 
-final readonly class QueryRuntimeLocatorMapProvider implements CqrsMapProviderInterface
-{
-    public function __construct(private CqrsMap $map) {}
-
-    public function map(): CqrsMap
-    {
-        return $this->map;
-    }
-}
-
 final class QueryRuntimeLocatorContainer implements ContainerInterface
 {
     /** @var array<string, int> */
     public array $gets = [];
 
     /** @param array<string, mixed> $entries */
-    public function __construct(private readonly array $entries) {}
+    public function __construct(private readonly array $entries)
+    {
+    }
 
     public function get(string $id): mixed
     {
@@ -53,17 +42,14 @@ final class QueryRuntimeLocatorContainer implements ContainerInterface
 }
 
 it('resolves a query handler through the container for every locate', function (): void {
-    $map = new CqrsMap(queryHandlers: [
-        QueryRuntimeLocatorTestQuery::class => new HandlerDescriptor(
-            QueryRuntimeLocatorTestHandler::class,
-            'handle',
-        ),
-    ]);
+    $map = [
+        QueryRuntimeLocatorTestQuery::class => ['service' => QueryRuntimeLocatorTestHandler::class, 'method' => 'handle'],
+    ];
     $container = new QueryRuntimeLocatorContainer([
         QueryRuntimeLocatorTestHandler::class => new QueryRuntimeLocatorTestHandler(),
     ]);
     $locator = new QueryHandlerLocator(
-        new QueryRuntimeLocatorMapProvider($map),
+        $map,
         $container,
     );
     $query = new QueryRuntimeLocatorTestQuery();
@@ -81,20 +67,17 @@ it('reports invalid mapped query handler services with a typed locator exception
         ['__invoke', 'is not invokable'],
         ['missingMethod', 'has no public callable method'],
     ] as [$method, $message]) {
-        $map = new CqrsMap(queryHandlers: [
-            QueryRuntimeLocatorTestQuery::class => new HandlerDescriptor(
-                'invalid.query.handler',
-                $method,
-            ),
-        ]);
+        $map = [
+            QueryRuntimeLocatorTestQuery::class => ['service' => 'invalid.query.handler', 'method' => $method],
+        ];
         $locator = new QueryHandlerLocator(
-            new QueryRuntimeLocatorMapProvider($map),
+            $map,
             new QueryRuntimeLocatorContainer([
                 'invalid.query.handler' => new stdClass(),
             ]),
         );
 
-        expect(fn() => $locator->locateFor(new QueryRuntimeLocatorTestQuery()))
+        expect(fn () => $locator->locateFor(new QueryRuntimeLocatorTestQuery()))
             ->toThrow(InvalidHandlerException::class, $message);
     }
 });

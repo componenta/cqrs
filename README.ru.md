@@ -6,7 +6,7 @@
 composer require componenta/cqrs
 ```
 
-Зарегистрируйте `Componenta\CQRS\ConfigProvider`. Он предоставляет стандартные command/query bus, locators, operation factory, metadata provider и CQRS map provider.
+Зарегистрируйте `Componenta\CQRS\ConfigProvider`. Он предоставляет стандартные command/query bus, locators, operation factory, провайдер метаданных и общий сервис массивов регистраций.
 
 ## Команды и операции
 
@@ -112,36 +112,64 @@ $result = $queries->handle(new GetUserQuery($id));
 
 `QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` нормализует array context в immutable `Context`. Ключи query context подчиняются тому же non-empty string-key контракту, что и operation attributes.
 
-## CQRS map и окружения
+## Регистрация и карты
 
-Runtime discovery и compiled execution используют одну versioned CQRS map. Пустой валидный артефакт:
-
-```php
-['version' => 2]
-```
-
-Если `APP_ENV` отсутствует, окружение по умолчанию считается development. Поэтому отсутствующий `APP_ENV` или явный `APP_ENV=development` может использовать live discovery overlay из `componenta/cqrs-app`. Любое явно заданное non-development окружение, включая `production`, `staging` и `test`, является compiled-only и требует актуальный map artifact.
-
-Сборка:
-
-```bash
-APP_ENV=development php bin/console.php app:build
-```
-
-## Metadata
-
-`CommandMetadataProviderInterface` предоставляет:
+Ядро CQRS работает с массивами; поиск классов и загрузку файлов выполняет пакет интеграции. Требуются Config 3 и DI 5. Пакеты и приложение добавляют списки регистраций через ConfigProvider:
 
 ```php
-$metadata->get($command, Attribute::class);
-$metadata->isKnown($command);
+use Componenta\CQRS\ConfigKey;
+
+final class ApplicationConfigProvider extends \Componenta\Config\ConfigProvider
+{
+    protected function getConfig(): array
+    {
+        return [
+            ConfigKey::COMMAND_HANDLERS => [
+                ['message' => CreateUserCommand::class, 'service' => CreateUserHandler::class, 'method' => '__invoke'],
+            ],
+            ConfigKey::QUERY_HANDLERS => [
+                ['message' => GetUserQuery::class, 'service' => GetUserHandler::class, 'method' => 'handle'],
+            ],
+            ConfigKey::COMMAND_LISTENERS => [
+                ['message' => CreateUserCommand::class, 'service' => AuditListener::class, 'priority' => 10,
+                 'events' => [\Componenta\CQRS\Command\Event\CommandProcessedEvent::class]],
+            ],
+        ];
+    }
+}
 ```
 
-Стандартный `CompiledCommandMetadataProvider` в CQRS v4 строго map-backed. Отсутствующая metadata возвращает `null` и не появляется неявно только потому, что command class существует в runtime. Это выравнивает development discovery и compiled execution.
+Провайдер ядра регистрируют перед провайдерами приложения. Обработчики и слушатели создаются обычными средствами DI. Общий сервис `cqrs.maps` содержит три массива: `command_handlers`, `query_handlers`, `command_listeners`. Каждый локатор получает свою секцию.
 
-`ReflectionCommandMetadataProvider` остаётся только явной альтернативной реализацией.
+При прямом создании локатора массив обработчиков индексируется именем сообщения:
 
-Дополнительные пакеты добавляют свои metadata classes через `ConfigKey::COMMAND_METADATA_ATTRIBUTES`, чтобы `componenta/cqrs-app` обнаруживал и компилировал одинаковые descriptors.
+```php
+$locator = new \Componenta\CQRS\Command\Locator\CommandHandlerLocator([
+    CreateUserCommand::class => ['service' => CreateUserHandler::class, 'method' => '__invoke'],
+], $container);
+
+$command = new CreateUserCommand($email);
+$handler = $locator->locateFor($command);
+$handler($command);
+```
+
+Одинаковые регистрации обработчика объединяются. Разные обработчики одного имени вызывают `CqrsMapConflictException`; повтор одинаковой явной регистрации слушателя — `InvalidCqrsMapException`. Слушатели выполняются по убыванию приоритета, затем по ID сервиса и каноническому списку событий. Пустой список событий означает все события жизненного цикла команды.
+
+Имя определяется для каждого экземпляра сообщения. `supports()` не создаёт обработчик; каждое обращение к `locateFor()` получает сервис через контейнер с соблюдением его правил жизненного цикла. Слушатели фильтруются по событию до получения сервиса.
+
+[componenta/cqrs-app](https://github.com/componenta/cqrs-app) добавляет поиск по атрибутам и сборку через `app:build`. Готовый актуальный файл позволяет пропустить поиск; при отсутствии или повреждении файла используются исходники. Оба пути используют одинаковые локаторы и правила регистрации.
+
+## Метаданные
+
+`CommandMetadataProviderInterface` предоставляет одну операцию:
+
+```php
+$attribute = $metadata->get($command, MyAttribute::class);
+```
+
+Стандартный `ReflectionCommandMetadataProvider` читает класс команды независимо от карт и регистрации обработчика. Каждое обращение создаёт свежий атрибут, включая объектные аргументы. Отсутствующий атрибут или класс команды возвращает `null`. Некорректное объявление, повтор атрибута или ошибка его создания вызывает `InvalidCommandMetadataException`; ошибка создания сохраняется как исходная причина.
+
+Retry, lock и transport используют этот провайдер. Дополнительная регистрация или компиляция их атрибутов не требуется.
 
 ## Discovery attributes
 
@@ -149,7 +177,7 @@ $metadata->isKnown($command);
 
 ```php
 #[Componenta\CQRS\Command\Attribute\AsCommandHandler]
-#[Componenta\CQRS\Command\Attribute\AsCommandListener]
+#[Componenta\CQRS\Command\Attribute\AsCommandListener(CreateUserCommand::class)]
 #[Componenta\CQRS\Query\Attribute\AsQueryHandler]
 ```
 
@@ -159,7 +187,7 @@ Message handler должен занимать первый parameter slot. До�
 
 | Пакет | Назначение |
 |---|---|
-| `componenta/cqrs-app` | Development discovery и build-time compilation map |
+| `componenta/cqrs-app` | Поиск по атрибутам и явная сборка карт |
 | `componenta/cqrs-policy` | Авторизация command/query |
 | `componenta/cqrs-retry` | Retry metadata и middleware |
 | `componenta/cqrs-lock` | Resource locking |
@@ -176,4 +204,4 @@ composer analyse
 composer bench
 ```
 
-CI ориентирован на PHP 8.4/8.5, запускает Pest и PHPStan на максимальном уровне; обычный test suite также загружает benchmark setup как лёгкую проверку совместимости API.
+CI ориентирован на PHP 8.4/8.5 и запускает Pest и PHPStan на максимальном уровне.

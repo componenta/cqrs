@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command\Factory;
 use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
+use Componenta\CQRS\ConfigKey;
 use LogicException;
 use Psr\Container\ContainerInterface;
 
@@ -15,13 +15,12 @@ final class CommandListenerLocatorFactory
 {
     public function __invoke(ContainerInterface $container): CommandListenersLocatorInterface
     {
-        $mapProvider = $container->get(CqrsMapProviderInterface::class);
+        $maps = $container->get(ConfigKey::MAPS);
 
-        if (!$mapProvider instanceof CqrsMapProviderInterface) {
+        if (!is_array($maps) || !is_array($maps['command_listeners'] ?? null)) {
             throw new LogicException(sprintf(
-                'Container entry "%s" must implement %s.',
-                CqrsMapProviderInterface::class,
-                CqrsMapProviderInterface::class,
+                'Container entry "%s" must contain array "command_listeners".',
+                ConfigKey::MAPS,
             ));
         }
 
@@ -40,7 +39,7 @@ final class CommandListenerLocatorFactory
         }
 
         return new CommandListenersLocator(
-            $mapProvider,
+            $maps['command_listeners'],
             $container,
             $resolver,
         );

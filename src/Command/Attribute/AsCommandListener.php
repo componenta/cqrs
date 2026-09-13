@@ -33,6 +33,7 @@ final readonly class AsCommandListener
 
     /**
      * @param array<array-key, mixed> $eventTypes
+     * @phpstan-assert list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes
      * @throws InvalidArgumentException
      */
     public static function assertEventTypes(array $eventTypes): void

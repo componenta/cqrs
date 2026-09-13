@@ -2,44 +2,63 @@
 
 declare(strict_types=1);
 
-use Componenta\Config\ConfigKey as DependencyConfigKey;
-use Componenta\CQRS\Command\Factory\CommandHandlerLocatorFactory;
-use Componenta\CQRS\Command\Factory\CommandListenerLocatorFactory;
-use Componenta\CQRS\Command\Factory\CommandMetadataProviderFactory;
+use Componenta\Config\ConfigFactory;
+use Componenta\Config\ConfigProvider as BaseProvider;
+use Componenta\Config\ContainerValue;
+use Componenta\Config\Environment;
+use Componenta\CQRS\Command\CommandBusInterface;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
-use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
-use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
-use Componenta\CQRS\Command\OperationFactory;
-use Componenta\CQRS\Command\OperationFactoryInterface;
-use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Command\NamedCommandInterface;
 use Componenta\CQRS\ConfigProvider;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use Componenta\CQRS\Map\Factory\ConfigCqrsMapProviderFactory;
-use Componenta\CQRS\Query\Factory\QueryHandlerLocatorFactory;
-use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
+use Componenta\DI\ContainerFactory;
 
-it('registers map-backed CQRS runtime services and the default operation factory', function (): void {
-    $config = (new ConfigProvider())();
+function registrationContainer(callable ...$providers): ContainerValue
+{
+    $composition = (new ConfigFactory())->create(new Environment([]), new ConfigProvider(), ...$providers);
+    return (new ContainerFactory())->create($composition->config, $composition->dependencies);
+}
 
-    expect($config)->not->toHaveKey(ConfigKey::COMMAND_MIDDLEWARES)
-        ->and($config)->not->toHaveKey(ConfigKey::QUERY_MIDDLEWARES)
-        ->and($config[DependencyConfigKey::DEPENDENCIES][DependencyConfigKey::FACTORIES])
-        ->toMatchArray([
-            CqrsMapProviderInterface::class => ConfigCqrsMapProviderFactory::class,
-            QueryHandlerLocatorInterface::class => QueryHandlerLocatorFactory::class,
-            CommandHandlerLocatorInterface::class => CommandHandlerLocatorFactory::class,
-            CommandListenersLocatorInterface::class => CommandListenerLocatorFactory::class,
-            CommandMetadataProviderInterface::class => CommandMetadataProviderFactory::class,
-        ])
-        ->and($config[DependencyConfigKey::DEPENDENCIES][DependencyConfigKey::INVOKABLES] ?? [])
-        ->toBe([OperationFactory::class])
-        ->and($config[DependencyConfigKey::DEPENDENCIES][DependencyConfigKey::ALIASES] ?? [])
-        ->toBe([
-            OperationFactoryInterface::class => OperationFactory::class,
-        ])
-        ->and(defined(ConfigKey::class . '::COMMAND_HANDLER_MAP'))->toBeFalse()
-        ->and(defined(ConfigKey::class . '::QUERY_HANDLER_MAP'))->toBeFalse()
-        ->and(defined(ConfigKey::class . '::COMMAND_LISTENER_MAP'))->toBeFalse()
-        ->and(defined(ConfigKey::class . '::COMMAND_ATTRIBUTE_MAP'))->toBeFalse()
-        ->and(defined(ConfigKey::class . '::COMPILED_MAPS'))->toBeFalse();
+it('combines registrations from providers and dispatches through the existing container', function (): void {
+    $seen = new ArrayObject();
+    $provider = static fn (string $name): BaseProvider => new class ($name, $seen) extends BaseProvider {
+        public function __construct(private string $name, private ArrayObject $seen)
+        {
+        }
+        protected function getConfig(): array
+        {
+            return ['cqrs.command_handlers' => [
+                ['message' => $this->name, 'service' => $this->name, 'method' => '__invoke'],
+            ]];
+        }
+        protected function getServices(): array
+        {
+            return [$this->name => function (object $command): string {
+                $this->seen[] = $this->name;
+                return $this->name;
+            }];
+        }
+    };
+    $container = registrationContainer($provider('first'), $provider('second'));
+    $bus = $container->get(CommandBusInterface::class);
+    foreach (['first', 'second'] as $name) {
+        $command = new readonly class ($name) implements NamedCommandInterface {
+            public function __construct(public string $commandName)
+            {
+            }
+        };
+        expect($bus->dispatch($command)->result?->value)->toBe($name);
+    }
+    expect($seen->getArrayCopy())->toBe(['first', 'second']);
+});
+
+it('rejects conflicting handler registrations before resolving any handler', function (): void {
+    $first = static fn (): array => ['cqrs.command_handlers' => [
+        ['message' => 'message', 'service' => 'first', 'method' => '__invoke'],
+    ]];
+    $second = static fn (): array => ['cqrs.command_handlers' => [
+        ['message' => 'message', 'service' => 'second', 'method' => '__invoke'],
+    ]];
+    $container = registrationContainer($first, $second);
+    expect(fn () => $container->get(CommandHandlerLocatorInterface::class))
+        ->toThrow(\Componenta\DI\Exception\ResolutionException::class, 'message');
 });

@@ -11,10 +11,6 @@ use Componenta\CQRS\Command\Exception\InvalidListenerException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandListenersLocator;
 use Componenta\CQRS\Command\Operation;
-use Componenta\CQRS\Map\CommandListenerDescriptor;
-use Componenta\CQRS\Map\CqrsMap;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use Componenta\CQRS\Map\HandlerDescriptor;
 use Psr\Container\ContainerInterface;
 
 final readonly class RuntimeLocatorTestCommand
@@ -34,18 +30,6 @@ final readonly class RuntimeLocatorTestListener implements CommandListenerInterf
     public function handleEvent(
         CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
     ): void {
-    }
-}
-
-final readonly class RuntimeLocatorTestMapProvider implements CqrsMapProviderInterface
-{
-    public function __construct(private CqrsMap $map)
-    {
-    }
-
-    public function map(): CqrsMap
-    {
-        return $this->map;
     }
 }
 
@@ -73,17 +57,14 @@ final class RuntimeLocatorTestContainer implements ContainerInterface
 }
 
 it('resolves a handler service through the container for every locate', function (): void {
-    $map = new CqrsMap(commandHandlers: [
-        RuntimeLocatorTestCommand::class => new HandlerDescriptor(
-            RuntimeLocatorTestHandler::class,
-            'handle',
-        ),
-    ]);
+    $map = [
+        RuntimeLocatorTestCommand::class => ['service' => RuntimeLocatorTestHandler::class, 'method' => 'handle'],
+    ];
     $container = new RuntimeLocatorTestContainer([
         RuntimeLocatorTestHandler::class => new RuntimeLocatorTestHandler(),
     ]);
     $locator = new CommandHandlerLocator(
-        new RuntimeLocatorTestMapProvider($map),
+        $map,
         $container,
     );
     $command = new RuntimeLocatorTestCommand();
@@ -101,58 +82,50 @@ it('reports invalid mapped handler services with the documented locator exceptio
         ['__invoke', 'is not invokable'],
         ['missingMethod', 'has no public callable method'],
     ] as [$method, $message]) {
-        $map = new CqrsMap(commandHandlers: [
-            RuntimeLocatorTestCommand::class => new HandlerDescriptor('invalid.handler', $method),
-        ]);
+        $map = [
+            RuntimeLocatorTestCommand::class => ['service' => 'invalid.handler', 'method' => $method],
+        ];
         $locator = new CommandHandlerLocator(
-            new RuntimeLocatorTestMapProvider($map),
+            $map,
             new RuntimeLocatorTestContainer(['invalid.handler' => new stdClass()]),
         );
 
-        expect(fn() => $locator->locateFor(new RuntimeLocatorTestCommand()))
+        expect(fn () => $locator->locateFor(new RuntimeLocatorTestCommand()))
             ->toThrow(InvalidHandlerException::class, $message);
     }
 });
 
 it('reports invalid mapped listener services with a typed locator exception', function (): void {
-    $map = new CqrsMap(commandListeners: [
+    $map = [
         RuntimeLocatorTestCommand::class => [
-            new CommandListenerDescriptor('invalid.listener'),
+            ['service' => 'invalid.listener', 'events' => [], 'priority' => 0],
         ],
-    ]);
+    ];
     $locator = new CommandListenersLocator(
-        new RuntimeLocatorTestMapProvider($map),
+        $map,
         new RuntimeLocatorTestContainer(['invalid.listener' => new stdClass()]),
     );
     $event = new CommandProcessEvent(Operation::create(new RuntimeLocatorTestCommand()));
 
-    expect(fn() => iterator_to_array($locator->locateFor($event)))
+    expect(fn () => iterator_to_array($locator->locateFor($event)))
         ->toThrow(InvalidListenerException::class, 'must implement');
 });
 
 it('filters listener events before container access and resolves matching descriptors through the container', function (): void {
-    $map = new CqrsMap(commandListeners: [
+    $map = [
         RuntimeLocatorTestCommand::class => [
-            new CommandListenerDescriptor(
-                'listener.skipped',
-                [CommandFailedEvent::class],
-                100,
-            ),
-            new CommandListenerDescriptor('listener.matching', [], 50),
-            new CommandListenerDescriptor(
-                'listener.matching',
-                [CommandProcessEvent::class],
-                0,
-            ),
+            ['service' => 'listener.skipped', 'events' => [CommandFailedEvent::class], 'priority' => 100],
+            ['service' => 'listener.matching', 'events' => [], 'priority' => 50],
+            ['service' => 'listener.matching', 'events' => [CommandProcessEvent::class], 'priority' => 0],
         ],
-    ]);
+    ];
     $listener = new RuntimeLocatorTestListener();
     $container = new RuntimeLocatorTestContainer([
         'listener.skipped' => new RuntimeLocatorTestListener(),
         'listener.matching' => $listener,
     ]);
     $locator = new CommandListenersLocator(
-        new RuntimeLocatorTestMapProvider($map),
+        $map,
         $container,
     );
     $event = new CommandProcessEvent(Operation::create(new RuntimeLocatorTestCommand()));

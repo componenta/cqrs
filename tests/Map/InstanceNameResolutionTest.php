@@ -5,9 +5,6 @@ declare(strict_types=1);
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\NamedCommandInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\Map\CqrsMap;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use Componenta\CQRS\Map\HandlerDescriptor;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\CQRS\Query\NamedQueryInterface;
 use Psr\Container\ContainerInterface;
@@ -38,18 +35,6 @@ final readonly class InstanceNameHandler
     }
 }
 
-final readonly class InstanceNameMapProvider implements CqrsMapProviderInterface
-{
-    public function __construct(private CqrsMap $map)
-    {
-    }
-
-    public function map(): CqrsMap
-    {
-        return $this->map;
-    }
-}
-
 final readonly class InstanceNameContainer implements ContainerInterface
 {
     /** @param array<string, object> $entries */
@@ -69,12 +54,12 @@ final readonly class InstanceNameContainer implements ContainerInterface
 }
 
 it('resolves command names per instance instead of poisoning the class cache', function (): void {
-    $map = new CqrsMap(commandHandlers: [
-        'command.a' => new HandlerDescriptor('handler.a', '__invoke'),
-        'command.b' => new HandlerDescriptor('handler.b', '__invoke'),
-    ]);
+    $map = [
+        'command.a' => ['service' => 'handler.a', 'method' => '__invoke'],
+        'command.b' => ['service' => 'handler.b', 'method' => '__invoke'],
+    ];
     $locator = new CommandHandlerLocator(
-        new InstanceNameMapProvider($map),
+        $map,
         new InstanceNameContainer([
             'handler.a' => new InstanceNameHandler('a'),
             'handler.b' => new InstanceNameHandler('b'),
@@ -88,12 +73,12 @@ it('resolves command names per instance instead of poisoning the class cache', f
 });
 
 it('resolves query names per instance instead of poisoning the class cache', function (): void {
-    $map = new CqrsMap(queryHandlers: [
-        'query.a' => new HandlerDescriptor('handler.a', '__invoke'),
-        'query.b' => new HandlerDescriptor('handler.b', '__invoke'),
-    ]);
+    $map = [
+        'query.a' => ['service' => 'handler.a', 'method' => '__invoke'],
+        'query.b' => ['service' => 'handler.b', 'method' => '__invoke'],
+    ];
     $locator = new QueryHandlerLocator(
-        new InstanceNameMapProvider($map),
+        $map,
         new InstanceNameContainer([
             'handler.a' => new InstanceNameHandler('a'),
             'handler.b' => new InstanceNameHandler('b'),
@@ -107,10 +92,10 @@ it('resolves query names per instance instead of poisoning the class cache', fun
 });
 
 it('uses the named-command fallback when a custom resolver does not support the instance', function (): void {
-    $map = new CqrsMap(commandHandlers: [
-        'command.a' => new HandlerDescriptor('handler.a', '__invoke'),
-    ]);
-    $resolver = new class implements CommandNameResolverInterface {
+    $map = [
+        'command.a' => ['service' => 'handler.a', 'method' => '__invoke'],
+    ];
+    $resolver = new class () implements CommandNameResolverInterface {
         public function supports(object $command): bool
         {
             return false;
@@ -122,7 +107,7 @@ it('uses the named-command fallback when a custom resolver does not support the 
         }
     };
     $locator = new CommandHandlerLocator(
-        new InstanceNameMapProvider($map),
+        $map,
         new InstanceNameContainer(['handler.a' => new InstanceNameHandler('a')]),
         $resolver,
     );

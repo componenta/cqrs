@@ -6,7 +6,7 @@ namespace Componenta\CQRS\Query\Resolver;
 
 final class CompositeQueryNameResolver implements QueryNameResolverInterface
 {
-    /** @var list<QueryNameResolverInterface> */
+    /** @var array<int|string, QueryNameResolverInterface> */
     private array $resolvers;
 
     public function __construct(
@@ -20,7 +20,7 @@ final class CompositeQueryNameResolver implements QueryNameResolverInterface
     {
         return array_any(
             $this->resolvers,
-            static fn(QueryNameResolverInterface $resolver): bool => $resolver->supports($query),
+            static fn (QueryNameResolverInterface $resolver): bool => $resolver->supports($query),
         ) || $this->fallback->supports($query);
     }
 

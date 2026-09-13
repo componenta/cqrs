@@ -9,7 +9,6 @@ use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
-use Componenta\DI\Exception\CallableExceptionInterface;
 
 final readonly class HandleCommandHandler implements OperationHandlerInterface
 {
@@ -19,7 +18,6 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
     ) {
     }
 
-    /** @throws CallableExceptionInterface */
     public function handle(OperationInterface $operation): OperationInterface
     {
         $handler = $this->locator->locateFor($operation->command);

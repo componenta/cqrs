@@ -10,18 +10,27 @@ use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
 use Componenta\CQRS\Command\Exception\InvalidListenerException;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Psr\Container\ContainerInterface;
+use Componenta\CQRS\Internal\RegistrationNormalizer;
 
+/**
+ * @phpstan-import-type Handler from RegistrationNormalizer
+ * @phpstan-import-type Listener from RegistrationNormalizer
+ */
 final class CommandListenersLocator implements CommandListenersLocatorInterface
 {
     use CommandNameResolution;
 
+    /** @var array<array-key, list<Listener>> */
+    private readonly array $listeners;
+
+    /** @param array<array-key, mixed> $listeners */
     public function __construct(
-        private readonly CqrsMapProviderInterface $mapProvider,
+        array $listeners,
         private readonly ContainerInterface $container,
         ?CommandNameResolverInterface $resolver = null,
     ) {
+        $this->listeners = RegistrationNormalizer::listeners($listeners);
         $this->resolver = $resolver;
     }
 
@@ -31,18 +40,18 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
         $commandName = $this->resolveCommandName($event->operation->command);
         $eventType = $event::class;
 
-        foreach ($this->mapProvider->map()->commandListeners($commandName) as $descriptor) {
-            if ($descriptor->events !== []
-                && !in_array($eventType, $descriptor->events, true)
+        foreach (($this->listeners[$commandName] ?? []) as $descriptor) {
+            if ($descriptor['events'] !== []
+                && !in_array($eventType, $descriptor['events'], true)
             ) {
                 continue;
             }
 
-            $listener = $this->container->get($descriptor->service);
+            $listener = $this->container->get($descriptor['service']);
 
             if (!$listener instanceof CommandListenerInterface) {
                 throw InvalidListenerException::serviceType(
-                    $descriptor->service,
+                    $descriptor['service'],
                     get_debug_type($listener),
                 );
             }

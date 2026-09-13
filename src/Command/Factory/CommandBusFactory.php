@@ -19,12 +19,12 @@ final class CommandBusFactory
 {
     public function __invoke(ContainerInterface $container): CommandBus
     {
-        $config = $container->get(ConfigKey::CONFIG);
+        $config = $container->get(Config::class);
 
         if (!$config instanceof Config) {
             throw new LogicException(sprintf(
                 'Container entry "%s" must be a %s instance.',
-                ConfigKey::CONFIG,
+                Config::class,
                 Config::class,
             ));
         }

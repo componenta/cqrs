@@ -6,7 +6,7 @@ namespace Componenta\CQRS\Command\Resolver;
 
 final class CompositeCommandNameResolver implements CommandNameResolverInterface
 {
-    /** @var list<CommandNameResolverInterface> */
+    /** @var array<int|string, CommandNameResolverInterface> */
     private array $resolvers;
 
     public function __construct(
@@ -20,7 +20,7 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
     {
         return array_any(
             $this->resolvers,
-            static fn(CommandNameResolverInterface $resolver): bool => $resolver->supports($command),
+            static fn (CommandNameResolverInterface $resolver): bool => $resolver->supports($command),
         ) || $this->fallback->supports($command);
     }
 

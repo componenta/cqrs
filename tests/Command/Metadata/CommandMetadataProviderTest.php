@@ -2,153 +2,92 @@
 
 declare(strict_types=1);
 
-use Componenta\Config\Config;
+use Componenta\CQRS\Command\Exception\InvalidCommandMetadataException;
 use Componenta\CQRS\Command\Factory\CommandMetadataProviderFactory;
-use Componenta\CQRS\Command\Metadata\CompiledCommandMetadataProvider;
 use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
-use Componenta\CQRS\ConfigKey;
-use Componenta\CQRS\Map\ConfigCqrsMapProvider;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
-use Componenta\CQRS\Map\Exception\InvalidCqrsMapException;
 use Componenta\CQRS\Tests\Fixture\FakeContainer;
 
-#[Attribute(Attribute::TARGET_CLASS)]
-final readonly class CqrsCompiledMetadata
+final class MetadataPayload
 {
-    public function __construct(
-        public string $transport,
-        public int $delay = 0,
-    ) {
+    public string $value = 'initial';
+}
+#[Attribute(Attribute::TARGET_CLASS)]
+final class MetadataWithObject
+{
+    public function __construct(public MetadataPayload $payload)
+    {
     }
 }
-
-#[CqrsCompiledMetadata('reflection', 9)]
-final readonly class CqrsCompiledUnknownCommand
+#[MetadataWithObject(new MetadataPayload())]
+final class MetadataCommand
+{
+}
+#[Attribute(Attribute::TARGET_METHOD)]
+final class MethodOnlyMetadata
+{
+}
+#[Attribute(Attribute::TARGET_CLASS)]
+final class ThrowingMetadata
+{
+    public function __construct()
+    {
+        throw new DomainException('metadata failed');
+    }
+}
+#[ThrowingMetadata]
+final class ThrowingMetadataCommand
+{
+}
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+final class RepeatedMetadata
+{
+}
+#[RepeatedMetadata, RepeatedMetadata]
+final class RepeatedMetadataCommand
 {
 }
 
-final readonly class CqrsCompiledAnnotatedCommand
-{
-}
+it('reads metadata without any command registration and creates fresh nested objects on each lookup', function (): void {
+    $provider = (new CommandMetadataProviderFactory())(new FakeContainer([]));
+    $first = $provider->get(new MetadataCommand(), MetadataWithObject::class);
+    $first->payload->value = 'changed';
+    $second = $provider->get(MetadataCommand::class, MetadataWithObject::class);
 
-final readonly class CqrsCompiledPlainCommand
-{
-}
+    expect($second->payload->value)->toBe('initial')
+        ->and($second)->not->toBe($first)
+        ->and($second->payload)->not->toBe($first->payload);
+});
 
-function compiledCommandMetadataMapProviderForTests(): CqrsMapProviderInterface
-{
-    return new ConfigCqrsMapProvider(new Config([
-        ConfigKey::CQRS_MAP => [
-            'version' => 2,
-            'commands' => [
-                'known' => [
-                    CqrsCompiledAnnotatedCommand::class => true,
-                    CqrsCompiledPlainCommand::class => true,
-                ],
-                'metadata' => [
-                    CqrsCompiledAnnotatedCommand::class => [
-                        CqrsCompiledMetadata::class => [
-                            'arguments' => [
-                                'transport' => 'compiled',
-                                'delay' => 7,
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ],
-    ]));
-}
+it('returns null when a command has no requested metadata', function (): void {
+    expect((new ReflectionCommandMetadataProvider())->get(new stdClass(), MetadataWithObject::class))->toBeNull();
+});
 
-describe('Command metadata provider', function (): void {
-    it('hydrates a fresh generic attribute from each compiled descriptor lookup', function (): void {
-        $provider = new CompiledCommandMetadataProvider(
-            compiledCommandMetadataMapProviderForTests(),
-        );
+it('rejects invalid metadata attribute declarations', function (string $attribute, string $message): void {
+    expect(fn () => (new ReflectionCommandMetadataProvider())->get(MetadataCommand::class, $attribute))
+        ->toThrow(InvalidCommandMetadataException::class, $message);
+})->with([
+    ['MissingMetadataClass', 'does not exist'],
+    [stdClass::class, '#[Attribute]'],
+    [MethodOnlyMetadata::class, 'class targets'],
+]);
 
-        $metadata = $provider->get(
-            CqrsCompiledAnnotatedCommand::class,
-            CqrsCompiledMetadata::class,
-        );
+it('rejects repeated metadata instead of selecting an arbitrary instance', function (): void {
+    expect(fn () => (new ReflectionCommandMetadataProvider())->get(RepeatedMetadataCommand::class, RepeatedMetadata::class))
+        ->toThrow(InvalidCommandMetadataException::class, 'repeated');
+});
 
-        expect($metadata)->toBeInstanceOf(CqrsCompiledMetadata::class)
-            ->and($metadata->transport)->toBe('compiled')
-            ->and($metadata->delay)->toBe(7)
-            ->and($provider->get(
-                CqrsCompiledAnnotatedCommand::class,
-                CqrsCompiledMetadata::class,
-            ))->not->toBe($metadata)
-            ->and($provider->isKnown(CqrsCompiledAnnotatedCommand::class))->toBeTrue();
-    });
+it('preserves the original metadata constructor error', function (): void {
+    try {
+        (new ReflectionCommandMetadataProvider())->get(ThrowingMetadataCommand::class, ThrowingMetadata::class);
+        test()->fail('Metadata constructor must fail.');
+    } catch (InvalidCommandMetadataException $exception) {
+        expect($exception->getPrevious())->toBeInstanceOf(DomainException::class)
+            ->and($exception->getPrevious()->getMessage())->toBe('metadata failed');
+    }
+});
 
-    it('returns null for a known command without compiled metadata', function (): void {
-        $provider = new CompiledCommandMetadataProvider(
-            compiledCommandMetadataMapProviderForTests(),
-        );
 
-        expect($provider->get(
-            CqrsCompiledPlainCommand::class,
-            CqrsCompiledMetadata::class,
-        ))->toBeNull();
-    });
-
-    it('does not reflect metadata for a command outside the active map', function (): void {
-        $provider = new CompiledCommandMetadataProvider(
-            compiledCommandMetadataMapProviderForTests(),
-        );
-
-        expect($provider->get(
-            CqrsCompiledUnknownCommand::class,
-            CqrsCompiledMetadata::class,
-        ))->toBeNull()
-            ->and($provider->isKnown(CqrsCompiledUnknownCommand::class))->toBeFalse();
-    });
-
-    it('keeps reflection metadata available as an explicit opt-in provider', function (): void {
-        $provider = new ReflectionCommandMetadataProvider();
-
-        $metadata = $provider->get(
-            CqrsCompiledUnknownCommand::class,
-            CqrsCompiledMetadata::class,
-        );
-
-        expect($metadata)->toBeInstanceOf(CqrsCompiledMetadata::class)
-            ->and($metadata->transport)->toBe('reflection')
-            ->and($metadata->delay)->toBe(9)
-            ->and($provider->isKnown(CqrsCompiledUnknownCommand::class))->toBeTrue();
-    });
-
-    it('rejects metadata classes that are not PHP attributes', function (): void {
-        $provider = new ConfigCqrsMapProvider(new Config([
-            ConfigKey::CQRS_MAP => [
-                'version' => 2,
-                'commands' => [
-                    'metadata' => [
-                        CqrsCompiledAnnotatedCommand::class => [
-                            stdClass::class => ['arguments' => []],
-                        ],
-                    ],
-                ],
-            ],
-        ]));
-        $metadata = new CompiledCommandMetadataProvider($provider);
-
-        expect(fn(): ?object => $metadata->get(
-            CqrsCompiledAnnotatedCommand::class,
-            stdClass::class,
-        ))->toThrow(InvalidCqrsMapException::class, 'not declared with #[Attribute]');
-    });
-
-    it('builds the generic provider from the shared map provider service', function (): void {
-        $mapProvider = compiledCommandMetadataMapProviderForTests();
-        $provider = (new CommandMetadataProviderFactory())(new FakeContainer([
-            CqrsMapProviderInterface::class => $mapProvider,
-        ]));
-
-        expect($provider)->toBeInstanceOf(CompiledCommandMetadataProvider::class)
-            ->and($provider->get(
-                CqrsCompiledAnnotatedCommand::class,
-                CqrsCompiledMetadata::class,
-            ))->toBeInstanceOf(CqrsCompiledMetadata::class);
-    });
+it('returns null for an unavailable command class', function (): void {
+    expect((new ReflectionCommandMetadataProvider())->get('MissingCommandForMetadataLookup', MetadataWithObject::class))
+        ->toBeNull();
 });

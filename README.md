@@ -6,7 +6,7 @@
 composer require componenta/cqrs
 ```
 
-Register `Componenta\CQRS\ConfigProvider`. It provides the standard command/query buses, locators, operation factory, metadata provider, and CQRS map provider.
+Register `Componenta\CQRS\ConfigProvider`. It provides the standard command/query buses, locators, operation factory, metadata provider, and the shared arrays of CQRS registrations.
 
 ## Commands and operations
 
@@ -112,36 +112,64 @@ $result = $queries->handle(new GetUserQuery($id));
 
 `QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` normalizes array context to immutable `Context`. Query context attributes use the same non-empty string-key invariant as operation attributes.
 
-## CQRS map and environments
+## Registration and maps
 
-Runtime discovery and compiled execution use one versioned CQRS map model. An empty valid artifact is:
+The core package uses arrays and does not scan application classes or read cache files. It requires Config 3 and DI 5. Packages and applications append registration lists through their ConfigProvider:
 
 ```php
-['version' => 2]
+use Componenta\CQRS\ConfigKey;
+
+final class ApplicationConfigProvider extends \Componenta\Config\ConfigProvider
+{
+    protected function getConfig(): array
+    {
+        return [
+            ConfigKey::COMMAND_HANDLERS => [
+                ['message' => CreateUserCommand::class, 'service' => CreateUserHandler::class, 'method' => '__invoke'],
+            ],
+            ConfigKey::QUERY_HANDLERS => [
+                ['message' => GetUserQuery::class, 'service' => GetUserHandler::class, 'method' => 'handle'],
+            ],
+            ConfigKey::COMMAND_LISTENERS => [
+                ['message' => CreateUserCommand::class, 'service' => AuditListener::class, 'priority' => 10,
+                 'events' => [\Componenta\CQRS\Command\Event\CommandProcessedEvent::class]],
+            ],
+        ];
+    }
+}
 ```
 
-The application environment defaults to development when `APP_ENV` is absent. Therefore a missing `APP_ENV` or explicit `APP_ENV=development` may use the live discovery overlay from `componenta/cqrs-app`. Any explicit non-development environment, including `production`, `staging`, and `test`, is compiled-only and requires a current map artifact.
+Register the core provider before application providers. Handler and listener services use normal DI autowiring or explicit factories. The shared DI service `cqrs.maps` contains three arrays: `command_handlers`, `query_handlers`, and `command_listeners`. Each locator receives its own section.
 
-Build it from development discovery:
+For direct construction, handlers are keyed by message name:
 
-```bash
-APP_ENV=development php bin/console.php app:build
+```php
+$locator = new \Componenta\CQRS\Command\Locator\CommandHandlerLocator([
+    CreateUserCommand::class => ['service' => CreateUserHandler::class, 'method' => '__invoke'],
+], $container);
+
+$command = new CreateUserCommand($email);
+$handler = $locator->locateFor($command);
+$handler($command);
 ```
+
+Identical handler registrations collapse; different handlers for one name throw `CqrsMapConflictException`. Identical explicit listener registrations throw `InvalidCqrsMapException`. Listeners run by descending priority, then service ID and canonical event list. An empty event list matches every command lifecycle event.
+
+Names are resolved for each message instance. `supports()` does not instantiate a handler. Each `locateFor()` obtains services through the container, preserving the container's sharing rules. Listeners are filtered by event before service lookup.
+
+[componenta/cqrs-app](https://github.com/componenta/cqrs-app) adds attribute discovery and `app:build`. A current file avoids discovery; a missing or invalid file falls back to source. Both paths use these same locators and registration rules.
 
 ## Metadata
 
-`CommandMetadataProviderInterface` exposes:
+`CommandMetadataProviderInterface` exposes one operation:
 
 ```php
-$metadata->get($command, Attribute::class);
-$metadata->isKnown($command);
+$attribute = $metadata->get($command, MyAttribute::class);
 ```
 
-CQRS v4's standard `CompiledCommandMetadataProvider` is strictly map-backed. Missing metadata returns `null`; it never appears implicitly because the command class happens to exist at runtime. This keeps development discovery and compiled execution on the same metadata contract.
+The default `ReflectionCommandMetadataProvider` reads the command class independently of handler registration and maps. Each call creates a fresh attribute, including object arguments. An absent attribute or command class returns `null`. Invalid attribute declarations, repeated metadata, or construction failures throw `InvalidCommandMetadataException`; construction failures retain their original cause.
 
-`ReflectionCommandMetadataProvider` remains available only as an explicit alternative implementation.
-
-Optional packages add their metadata classes through `ConfigKey::COMMAND_METADATA_ATTRIBUTES`, allowing `componenta/cqrs-app` to discover and compile the same descriptors.
+Retry, lock and transport middleware use this provider. Their attributes need no separate registration or compilation.
 
 ## Discovery attributes
 
@@ -149,7 +177,7 @@ Optional packages add their metadata classes through `ConfigKey::COMMAND_METADAT
 
 ```php
 #[Componenta\CQRS\Command\Attribute\AsCommandHandler]
-#[Componenta\CQRS\Command\Attribute\AsCommandListener]
+#[Componenta\CQRS\Command\Attribute\AsCommandListener(CreateUserCommand::class)]
 #[Componenta\CQRS\Query\Attribute\AsQueryHandler]
 ```
 
@@ -159,7 +187,7 @@ A handler's message must occupy the first parameter slot. Additional required ha
 
 | Package | Responsibility |
 |---|---|
-| `componenta/cqrs-app` | Development discovery and build-time map compilation |
+| `componenta/cqrs-app` | Attribute discovery and explicit map building |
 | `componenta/cqrs-policy` | Command/query authorization |
 | `componenta/cqrs-retry` | Retry metadata and middleware |
 | `componenta/cqrs-lock` | Resource locking |
@@ -176,4 +204,4 @@ composer analyse
 composer bench
 ```
 
-CI targets PHP 8.4/8.5, runs the Pest suite and PHPStan at maximum level, and the ordinary test suite loads benchmark setup as an API compatibility check.
+CI targets PHP 8.4/8.5, runs the Pest suite and PHPStan at maximum level.

@@ -14,5 +14,5 @@ interface CommandMetadataProviderInterface
      */
     public function get(object|string $command, string $attribute): ?object;
 
-    public function isKnown(object|string $command): bool;
+
 }

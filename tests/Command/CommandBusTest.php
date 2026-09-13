@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Componenta\Config\Config;
 use Componenta\CQRS\Command\CommandBus;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
@@ -16,19 +15,21 @@ use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
-use Componenta\CQRS\ConfigKey;
-use Componenta\CQRS\Map\ConfigCqrsMapProvider;
 use Componenta\CQRS\Tests\Fixture\FakeContainer;
 
 final readonly class CommandBusContractCommand
 {
-    public function __construct(public string $tag) {}
+    public function __construct(public string $tag)
+    {
+    }
 }
 
 function makeCommandBusTerminal(?ArrayObject $observed = null): OperationHandlerInterface
 {
-    return new readonly class($observed) implements OperationHandlerInterface {
-        public function __construct(private ?ArrayObject $observed) {}
+    return new readonly class ($observed) implements OperationHandlerInterface {
+        public function __construct(private ?ArrayObject $observed)
+        {
+        }
 
         public function handle(OperationInterface $operation): OperationInterface
         {
@@ -41,8 +42,10 @@ function makeCommandBusTerminal(?ArrayObject $observed = null): OperationHandler
 
 function makeCommandBusCommand(string $tag): object
 {
-    return new readonly class($tag) {
-        public function __construct(public string $tag) {}
+    return new readonly class ($tag) {
+        public function __construct(public string $tag)
+        {
+        }
     };
 }
 
@@ -55,7 +58,7 @@ it('dispatches a command without middleware and returns operation result', funct
 });
 
 it('uses a supplied operation factory before entering the middleware pipeline', function (): void {
-    $factory = new readonly class implements OperationFactoryInterface {
+    $factory = new readonly class () implements OperationFactoryInterface {
         public function create(object $command, array $attributes = []): OperationInterface
         {
             return Operation::create($command, [...$attributes, 'factory' => 'custom']);
@@ -89,8 +92,10 @@ it('chains command middlewares in registration order, onion-style', function ():
     $observed = new ArrayObject();
 
     $makeMiddleware = static function (string $tag) use ($observed): MiddlewareInterface {
-        return new readonly class($observed, $tag) implements MiddlewareInterface {
-            public function __construct(private ArrayObject $observed, private string $tag) {}
+        return new readonly class ($observed, $tag) implements MiddlewareInterface {
+            public function __construct(private ArrayObject $observed, private string $tag)
+            {
+            }
 
             public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
             {
@@ -122,8 +127,10 @@ it('chains command middlewares in registration order, onion-style', function ():
 it('allows command middleware to short-circuit the terminal handler', function (): void {
     $observed = new ArrayObject();
 
-    $middleware = new readonly class($observed) implements MiddlewareInterface {
-        public function __construct(private ArrayObject $observed) {}
+    $middleware = new readonly class ($observed) implements MiddlewareInterface {
+        public function __construct(private ArrayObject $observed)
+        {
+        }
 
         public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
         {
@@ -142,14 +149,14 @@ it('allows command middleware to short-circuit the terminal handler', function (
 });
 
 it('rejects invalid middleware collections at the public constructor boundary', function (): void {
-    expect(fn() => new CommandBus(
+    expect(fn () => new CommandBus(
         makeCommandBusTerminal(),
         ['invalid'],
     ))->toThrow(InvalidArgumentException::class, 'must implement');
 });
 
 it('propagates exceptions from the terminal command handler', function (): void {
-    $terminal = new readonly class implements OperationHandlerInterface {
+    $terminal = new readonly class () implements OperationHandlerInterface {
         public function handle(OperationInterface $operation): OperationInterface
         {
             throw new RuntimeException('command failed');
@@ -157,15 +164,17 @@ it('propagates exceptions from the terminal command handler', function (): void 
     };
     $bus = new CommandBus($terminal);
 
-    expect(fn() => $bus->dispatch(makeCommandBusCommand('boom')))
+    expect(fn () => $bus->dispatch(makeCommandBusCommand('boom')))
         ->toThrow(RuntimeException::class, 'command failed');
 });
 
 it('dispatches command listeners in priority order', function (): void {
     $observed = new ArrayObject();
     $makeListener = static function (string $name) use ($observed): CommandListenerInterface {
-        return new readonly class($observed, $name) implements CommandListenerInterface {
-            public function __construct(private ArrayObject $observed, private string $name) {}
+        return new readonly class ($observed, $name) implements CommandListenerInterface {
+            public function __construct(private ArrayObject $observed, private string $name)
+            {
+            }
 
             public function handleEvent(CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event): void
             {
@@ -173,28 +182,11 @@ it('dispatches command listeners in priority order', function (): void {
             }
         };
     };
-    $provider = new ConfigCqrsMapProvider(new Config([
-        ConfigKey::CQRS_MAP => [
-            'version' => 2,
-            'commands' => [
-                'listeners' => [
-                    CommandBusContractCommand::class => [
-                        [
-                            'service' => 'listener.low',
-                            'events' => [CommandProcessEvent::class],
-                            'priority' => -10,
-                        ],
-                        [
-                            'service' => 'listener.high',
-                            'events' => [CommandProcessEvent::class],
-                            'priority' => 50,
-                        ],
-                    ],
-                ],
-            ],
-        ],
-    ]));
-    $locator = new CommandListenersLocator($provider, new FakeContainer([
+    $listeners = [CommandBusContractCommand::class => [
+        ['service' => 'listener.low', 'events' => [CommandProcessEvent::class], 'priority' => -10],
+        ['service' => 'listener.high', 'events' => [CommandProcessEvent::class], 'priority' => 50],
+    ]];
+    $locator = new CommandListenersLocator($listeners, new FakeContainer([
         'listener.low' => $makeListener('low'),
         'listener.high' => $makeListener('high'),
     ]));

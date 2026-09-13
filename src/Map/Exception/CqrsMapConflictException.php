@@ -15,12 +15,4 @@ final class CqrsMapConflictException extends InvalidCqrsMapException
         ));
     }
 
-    public static function metadata(string $command, string $attribute): self
-    {
-        return new self(sprintf(
-            'Conflicting command metadata "%s" is registered for command "%s".',
-            $attribute,
-            $command,
-        ));
-    }
 }

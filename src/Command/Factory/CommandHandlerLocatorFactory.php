@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command\Factory;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
+use Componenta\CQRS\ConfigKey;
 use LogicException;
 use Psr\Container\ContainerInterface;
 
@@ -15,13 +15,12 @@ final class CommandHandlerLocatorFactory
 {
     public function __invoke(ContainerInterface $container): CommandHandlerLocatorInterface
     {
-        $mapProvider = $container->get(CqrsMapProviderInterface::class);
+        $maps = $container->get(ConfigKey::MAPS);
 
-        if (!$mapProvider instanceof CqrsMapProviderInterface) {
+        if (!is_array($maps) || !is_array($maps['command_handlers'] ?? null)) {
             throw new LogicException(sprintf(
-                'Container entry "%s" must implement %s.',
-                CqrsMapProviderInterface::class,
-                CqrsMapProviderInterface::class,
+                'Container entry "%s" must contain array "command_handlers".',
+                ConfigKey::MAPS,
             ));
         }
 
@@ -40,7 +39,7 @@ final class CommandHandlerLocatorFactory
         }
 
         return new CommandHandlerLocator(
-            $mapProvider,
+            $maps['command_handlers'],
             $container,
             $resolver,
         );

@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Benchmarks;
 
 use Attribute;
-use Componenta\Config\Config;
 use Componenta\CQRS\Command\CommandBus;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Metadata\CommandMetadataProviderInterface;
-use Componenta\CQRS\Command\Metadata\CompiledCommandMetadataProvider;
 use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface as CommandMiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationInterface;
-use Componenta\CQRS\ConfigKey;
-use Componenta\CQRS\Map\ConfigCqrsMapProvider;
 use Componenta\CQRS\Query\Context\ContextInterface;
 use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
@@ -40,7 +36,6 @@ final class CqrsBench
     private QueryBus $queryBusWithTwoMiddlewares;
     private QueryBus $queryBusWithEightMiddlewares;
     private CommandMetadataProviderInterface $reflectionCommandMetadata;
-    private CommandMetadataProviderInterface $compiledCommandMetadata;
     private BenchmarkCommand $command;
     private BenchmarkQuery $query;
 
@@ -90,28 +85,6 @@ final class CqrsBench
         );
 
         $this->reflectionCommandMetadata = new ReflectionCommandMetadataProvider();
-        $this->compiledCommandMetadata = new CompiledCommandMetadataProvider(
-            new ConfigCqrsMapProvider(new Config([
-                ConfigKey::CQRS_MAP => [
-                    'version' => 2,
-                    'commands' => [
-                        'known' => [
-                            BenchmarkAttributedCommand::class => true,
-                        ],
-                        'metadata' => [
-                            BenchmarkAttributedCommand::class => [
-                                BenchmarkMetadata::class => [
-                                    'arguments' => [
-                                        'transport' => 'bench',
-                                        'delay' => 3,
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ])),
-        );
 
         $this->command = new BenchmarkCommand('payload');
         $this->query = new BenchmarkQuery('payload');
@@ -169,22 +142,14 @@ final class CqrsBench
         );
     }
 
-    #[Revs(10000)]
-    #[Groups(['cqrs', 'command', 'metadata', 'compiled'])]
-    public function benchCompiledCommandMetadataLookup(): void
-    {
-        $this->compiledCommandMetadata->get(
-            BenchmarkAttributedCommand::class,
-            BenchmarkMetadata::class,
-        );
-    }
 }
 
 final readonly class BenchmarkCommand
 {
     public function __construct(
         public string $payload,
-    ) {}
+    ) {
+    }
 }
 
 #[Attribute(Attribute::TARGET_CLASS)]
@@ -193,7 +158,8 @@ final readonly class BenchmarkMetadata
     public function __construct(
         public string $transport,
         public int $delay = 0,
-    ) {}
+    ) {
+    }
 }
 
 #[BenchmarkMetadata(transport: 'bench', delay: 3)]
@@ -201,21 +167,23 @@ final readonly class BenchmarkAttributedCommand
 {
     public function __construct(
         public string $payload = 'payload',
-    ) {}
+    ) {
+    }
 }
 
 final readonly class BenchmarkQuery
 {
     public function __construct(
         public string $payload,
-    ) {}
+    ) {
+    }
 }
 
 final class BenchmarkCommandHandlerLocator implements CommandHandlerLocatorInterface
 {
     public function locateFor(object $command): callable
     {
-        return static fn(BenchmarkCommand $command): string => $command->payload;
+        return static fn (BenchmarkCommand $command): string => $command->payload;
     }
 }
 
@@ -223,7 +191,7 @@ final class BenchmarkQueryHandlerLocator implements QueryHandlerLocatorInterface
 {
     public function locateFor(object $query): callable
     {
-        return static fn(BenchmarkQuery $query): string => $query->payload;
+        return static fn (BenchmarkQuery $query): string => $query->payload;
     }
 }
 

@@ -7,18 +7,27 @@ namespace Componenta\CQRS\Command\Locator;
 use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
 use Componenta\CQRS\Command\Exception\InvalidHandlerException;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Psr\Container\ContainerInterface;
+use Componenta\CQRS\Internal\RegistrationNormalizer;
 
+/**
+ * @phpstan-import-type Handler from RegistrationNormalizer
+ * @phpstan-import-type Listener from RegistrationNormalizer
+ */
 final class CommandHandlerLocator implements CommandHandlerLocatorInterface, CommandSupportAwareInterface
 {
     use CommandNameResolution;
 
+    /** @var array<array-key, Handler> */
+    private readonly array $handlers;
+
+    /** @param array<array-key, mixed> $handlers */
     public function __construct(
-        private readonly CqrsMapProviderInterface $mapProvider,
+        array $handlers,
         private readonly ContainerInterface $container,
         ?CommandNameResolverInterface $resolver = null,
     ) {
+        $this->handlers = RegistrationNormalizer::handlers($handlers, 'command_handlers');
         $this->resolver = $resolver;
     }
 
@@ -33,18 +42,18 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
     public function locateFor(object $command): callable
     {
         $commandName = $this->resolveCommandName($command);
-        $descriptor = $this->mapProvider->map()->commandHandler($commandName);
+        $descriptor = ($this->handlers[$commandName] ?? null);
 
         if ($descriptor === null) {
             throw new HandlerNotFoundException($commandName);
         }
 
-        $handler = $this->container->get($descriptor->service);
+        $handler = $this->container->get($descriptor['service']);
 
-        if ($descriptor->method === '__invoke') {
+        if ($descriptor['method'] === '__invoke') {
             if (!is_callable($handler)) {
                 throw InvalidHandlerException::serviceNotInvokable(
-                    $descriptor->service,
+                    $descriptor['service'],
                     $commandName,
                 );
             }
@@ -52,12 +61,12 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
             return $handler;
         }
 
-        $callable = [$handler, $descriptor->method];
+        $callable = [$handler, $descriptor['method']];
 
         if (!is_callable($callable)) {
             throw InvalidHandlerException::serviceMethodNotCallable(
-                $descriptor->service,
-                $descriptor->method,
+                $descriptor['service'],
+                $descriptor['method'],
             );
         }
 
@@ -66,8 +75,8 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
 
     public function supports(object $command): bool
     {
-        return $this->mapProvider->map()->commandHandler(
-            $this->resolveCommandName($command),
-        ) !== null;
+        return isset($this->handlers[
+            $this->resolveCommandName($command)
+        ]);
     }
 }

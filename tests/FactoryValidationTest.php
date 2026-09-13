@@ -22,10 +22,10 @@ use Componenta\DI\CallableInvokerInterface;
 
 function commandHandlerForFactoryTests(): HandleCommandHandler
 {
-    $locator = new class implements CommandHandlerLocatorInterface {
+    $locator = new class () implements CommandHandlerLocatorInterface {
         public function locateFor(object $command): callable
         {
-            return static fn(object $message): object => $message;
+            return static fn (object $message): object => $message;
         }
     };
 
@@ -34,10 +34,10 @@ function commandHandlerForFactoryTests(): HandleCommandHandler
 
 function queryHandlerForFactoryTests(): HandleQuery
 {
-    $locator = new class implements QueryHandlerLocatorInterface {
+    $locator = new class () implements QueryHandlerLocatorInterface {
         public function locateFor(object $query): callable
         {
-            return static fn(object $message): object => $message;
+            return static fn (object $message): object => $message;
         }
     };
 
@@ -46,28 +46,28 @@ function queryHandlerForFactoryTests(): HandleQuery
 
 it('rejects a configured command middleware service with the wrong type', function (): void {
     $container = new FakeContainer([
-        ConfigKey::CONFIG => new Config([
+        Config::class => new Config([
             ConfigKey::COMMAND_MIDDLEWARES => ['invalid.middleware'],
-        ]),
+        ], new \Componenta\Config\Environment([])),
         HandleCommandHandler::class => commandHandlerForFactoryTests(),
         'invalid.middleware' => new stdClass(),
     ]);
 
-    expect(fn() => (new CommandBusFactory())($container))
+    expect(fn () => (new CommandBusFactory())($container))
         ->toThrow(LogicException::class, 'must implement');
 });
 
 it('accepts a decorated terminal command handler through its public interface', function (): void {
-    $terminal = new class implements OperationHandlerInterface {
+    $terminal = new class () implements OperationHandlerInterface {
         public function handle(OperationInterface $operation): OperationInterface
         {
             return $operation;
         }
     };
     $container = new FakeContainer([
-        ConfigKey::CONFIG => new Config([
+        Config::class => new Config([
             ConfigKey::COMMAND_MIDDLEWARES => [],
-        ]),
+        ], new \Componenta\Config\Environment([])),
         HandleCommandHandler::class => $terminal,
     ]);
 
@@ -78,14 +78,14 @@ it('accepts a decorated terminal command handler through its public interface', 
 });
 
 it('injects the configured operation factory into the command bus', function (): void {
-    $operationFactory = new readonly class implements OperationFactoryInterface {
+    $operationFactory = new readonly class () implements OperationFactoryInterface {
         public function create(object $command, array $attributes = []): OperationInterface
         {
             return Operation::create($command, [...$attributes, 'factory' => 'container']);
         }
     };
     $container = new FakeContainer([
-        ConfigKey::CONFIG => new Config([ConfigKey::COMMAND_MIDDLEWARES => []]),
+        Config::class => new Config([ConfigKey::COMMAND_MIDDLEWARES => []], new \Componenta\Config\Environment([])),
         HandleCommandHandler::class => commandHandlerForFactoryTests(),
         OperationFactoryInterface::class => $operationFactory,
     ]);
@@ -97,25 +97,25 @@ it('injects the configured operation factory into the command bus', function ():
 
 it('rejects an invalid configured operation factory', function (): void {
     $container = new FakeContainer([
-        ConfigKey::CONFIG => new Config([ConfigKey::COMMAND_MIDDLEWARES => []]),
+        Config::class => new Config([ConfigKey::COMMAND_MIDDLEWARES => []], new \Componenta\Config\Environment([])),
         HandleCommandHandler::class => commandHandlerForFactoryTests(),
         OperationFactoryInterface::class => new stdClass(),
     ]);
 
-    expect(fn() => (new CommandBusFactory())($container))
+    expect(fn () => (new CommandBusFactory())($container))
         ->toThrow(LogicException::class, OperationFactoryInterface::class);
 });
 
 it('rejects a configured query middleware service with the wrong type', function (): void {
     $container = new FakeContainer([
-        ConfigKey::CONFIG => new Config([
+        Config::class => new Config([
             ConfigKey::QUERY_MIDDLEWARES => ['invalid.middleware'],
-        ]),
+        ], new \Componenta\Config\Environment([])),
         HandleQuery::class => queryHandlerForFactoryTests(),
         'invalid.middleware' => new stdClass(),
     ]);
 
-    expect(fn() => (new QueryBusFactory())($container))
+    expect(fn () => (new QueryBusFactory())($container))
         ->toThrow(LogicException::class, 'must implement');
 });
 
@@ -125,15 +125,15 @@ it('rejects an invalid command handler locator dependency', function (): void {
         CallableInvokerInterface::class => new CallableInvoker(),
     ]);
 
-    expect(fn() => (new HandleCommandHandlerFactory())($container))
+    expect(fn () => (new HandleCommandHandlerFactory())($container))
         ->toThrow(LogicException::class, CommandHandlerLocatorInterface::class);
 });
 
 it('rejects an invalid query callable invoker dependency', function (): void {
-    $locator = new class implements QueryHandlerLocatorInterface {
+    $locator = new class () implements QueryHandlerLocatorInterface {
         public function locateFor(object $query): callable
         {
-            return static fn(): null => null;
+            return static fn (): null => null;
         }
     };
     $container = new FakeContainer([
@@ -141,6 +141,6 @@ it('rejects an invalid query callable invoker dependency', function (): void {
         CallableInvokerInterface::class => new stdClass(),
     ]);
 
-    expect(fn() => (new HandleQueryFactory())($container))
+    expect(fn () => (new HandleQueryFactory())($container))
         ->toThrow(LogicException::class, CallableInvokerInterface::class);
 });

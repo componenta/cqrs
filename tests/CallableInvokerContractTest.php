@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use Componenta\Config\Config;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Operation;
-use Componenta\CQRS\ConfigKey;
-use Componenta\CQRS\Map\ConfigCqrsMapProvider;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\DI\CallableInvokerInterface;
@@ -16,7 +12,9 @@ use Psr\Container\ContainerInterface;
 
 final readonly class CallableInvokerContractMessage
 {
-    public function __construct(public string $value) {}
+    public function __construct(public string $value)
+    {
+    }
 }
 
 final class CallableInvokerContractHandler
@@ -29,7 +27,9 @@ final class CallableInvokerContractHandler
 
 final readonly class CallableInvokerContractContainer implements ContainerInterface
 {
-    public function __construct(private CallableInvokerContractHandler $handler) {}
+    public function __construct(private CallableInvokerContractHandler $handler)
+    {
+    }
 
     public function get(string $id): mixed
     {
@@ -58,21 +58,12 @@ final class CallableInvokerContractSpy implements CallableInvokerInterface
     }
 }
 
-function callableInvokerContractMapProvider(string $section): CqrsMapProviderInterface
+function callableInvokerContractHandlers(): array
 {
-    return new ConfigCqrsMapProvider(new Config([
-        ConfigKey::CQRS_MAP => [
-            'version' => 2,
-            $section => [
-                'handlers' => [
-                    CallableInvokerContractMessage::class => [
-                        'service' => CallableInvokerContractHandler::class,
-                        'method' => 'handle',
-                    ],
-                ],
-            ],
-        ],
-    ]));
+    return [CallableInvokerContractMessage::class => [
+        'service' => CallableInvokerContractHandler::class,
+        'method' => 'handle',
+    ]];
 }
 
 it('dispatches a compiled query handler through the configured callable invoker', function (): void {
@@ -81,7 +72,7 @@ it('dispatches a compiled query handler through the configured callable invoker'
     $invoker = new CallableInvokerContractSpy();
     $container = new CallableInvokerContractContainer($handler);
     $locator = new QueryHandlerLocator(
-        callableInvokerContractMapProvider('queries'),
+        callableInvokerContractHandlers(),
         $container,
     );
 
@@ -98,7 +89,7 @@ it('dispatches a compiled command handler through the configured callable invoke
     $invoker = new CallableInvokerContractSpy();
     $container = new CallableInvokerContractContainer($handler);
     $locator = new CommandHandlerLocator(
-        callableInvokerContractMapProvider('commands'),
+        callableInvokerContractHandlers(),
         $container,
     );
 

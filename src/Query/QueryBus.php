@@ -17,7 +17,7 @@ final class QueryBus implements QueryBusInterface
         HandleQuery $handler,
         MiddlewareInterface ... $middlewares
     ) {
-        $this->pipeline = self::compile($handler, $middlewares);
+        $this->pipeline = self::compile($handler, array_values($middlewares));
     }
 
     public function handle(object $query, ContextInterface|array $context = []): mixed
@@ -28,17 +28,17 @@ final class QueryBus implements QueryBusInterface
     }
 
     /**
-     * @param MiddlewareInterface[] $middlewares
+     * @param list<MiddlewareInterface> $middlewares
      */
     private static function compile(HandleQuery $handler, array $middlewares): Closure
     {
-        $pipeline = static fn(object $query, ContextInterface $context): mixed => $handler($query);
+        $pipeline = static fn (object $query, ContextInterface $context): mixed => $handler($query);
 
         for ($i = \count($middlewares) - 1; $i >= 0; --$i) {
             $middleware = $middlewares[$i];
             $next = $pipeline;
 
-            $pipeline = static fn(object $query, ContextInterface $context): mixed
+            $pipeline = static fn (object $query, ContextInterface $context): mixed
                 => $middleware->handle($query, $context, $next);
         }
 

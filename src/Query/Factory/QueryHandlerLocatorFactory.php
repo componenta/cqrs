@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Factory;
 
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
+use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
 use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
@@ -15,13 +15,12 @@ final class QueryHandlerLocatorFactory
 {
     public function __invoke(ContainerInterface $container): QueryHandlerLocatorInterface
     {
-        $mapProvider = $container->get(CqrsMapProviderInterface::class);
+        $maps = $container->get(ConfigKey::MAPS);
 
-        if (!$mapProvider instanceof CqrsMapProviderInterface) {
+        if (!is_array($maps) || !is_array($maps['query_handlers'] ?? null)) {
             throw new LogicException(sprintf(
-                'Container entry "%s" must implement %s.',
-                CqrsMapProviderInterface::class,
-                CqrsMapProviderInterface::class,
+                'Container entry "%s" must contain array "query_handlers".',
+                ConfigKey::MAPS,
             ));
         }
 
@@ -40,7 +39,7 @@ final class QueryHandlerLocatorFactory
         }
 
         return new QueryHandlerLocator(
-            $mapProvider,
+            $maps['query_handlers'],
             $container,
             $resolver,
         );

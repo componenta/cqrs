@@ -4,40 +4,49 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Locator;
 
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\Exception\HandlerNotFoundException;
 use Componenta\CQRS\Query\Exception\InvalidHandlerException;
 use Componenta\CQRS\Query\Resolver\QueryNameResolution;
 use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
 use Psr\Container\ContainerInterface;
+use Componenta\CQRS\Internal\RegistrationNormalizer;
 
+/**
+ * @phpstan-import-type Handler from RegistrationNormalizer
+ * @phpstan-import-type Listener from RegistrationNormalizer
+ */
 final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySupportAwareInterface
 {
     use QueryNameResolution;
 
+    /** @var array<array-key, Handler> */
+    private readonly array $handlers;
+
+    /** @param array<array-key, mixed> $handlers */
     public function __construct(
-        private readonly CqrsMapProviderInterface $mapProvider,
+        array $handlers,
         private readonly ContainerInterface $container,
         ?QueryNameResolverInterface $resolver = null,
     ) {
+        $this->handlers = RegistrationNormalizer::handlers($handlers, 'query_handlers');
         $this->resolver = $resolver;
     }
 
     public function locateFor(object $query): callable
     {
         $queryName = $this->resolveQueryName($query);
-        $descriptor = $this->mapProvider->map()->queryHandler($queryName);
+        $descriptor = ($this->handlers[$queryName] ?? null);
 
         if ($descriptor === null) {
             throw new HandlerNotFoundException($query, queryName: $queryName);
         }
 
-        $handler = $this->container->get($descriptor->service);
+        $handler = $this->container->get($descriptor['service']);
 
-        if ($descriptor->method === '__invoke') {
+        if ($descriptor['method'] === '__invoke') {
             if (!is_callable($handler)) {
                 throw InvalidHandlerException::serviceNotInvokable(
-                    $descriptor->service,
+                    $descriptor['service'],
                     $queryName,
                 );
             }
@@ -45,12 +54,12 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
             return $handler;
         }
 
-        $callable = [$handler, $descriptor->method];
+        $callable = [$handler, $descriptor['method']];
 
         if (!is_callable($callable)) {
             throw InvalidHandlerException::serviceMethodNotCallable(
-                $descriptor->service,
-                $descriptor->method,
+                $descriptor['service'],
+                $descriptor['method'],
             );
         }
 
@@ -59,8 +68,8 @@ final class QueryHandlerLocator implements QueryHandlerLocatorInterface, QuerySu
 
     public function supports(object $query): bool
     {
-        return $this->mapProvider->map()->queryHandler(
-            $this->resolveQueryName($query),
-        ) !== null;
+        return isset($this->handlers[
+            $this->resolveQueryName($query)
+        ]);
     }
 }

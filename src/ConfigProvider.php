@@ -12,7 +12,6 @@ use Componenta\CQRS\Command\Middleware\EventMiddleware;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationFactoryInterface;
-use Componenta\CQRS\Map\CqrsMapProviderInterface;
 use Componenta\CQRS\Query\Factory\HandleQueryFactory;
 use Componenta\CQRS\Query\Factory\QueryBusFactory;
 use Componenta\CQRS\Query\Factory\QueryHandlerLocatorFactory;
@@ -32,7 +31,7 @@ class ConfigProvider extends \Componenta\Config\ConfigProvider
     protected function getFactories(): array
     {
         return [
-            CqrsMapProviderInterface::class => Map\Factory\ConfigCqrsMapProviderFactory::class,
+            ConfigKey::MAPS => Factory\CqrsMapsFactory::class,
             QueryBusInterface::class => QueryBusFactory::class,
             QueryHandlerLocatorInterface::class => QueryHandlerLocatorFactory::class,
             HandleQuery::class => HandleQueryFactory::class,
