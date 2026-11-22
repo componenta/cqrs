@@ -19,7 +19,7 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
             if (!class_exists($class)) {
                 return null;
             }
-            $attributes = new ReflectionClass($class)->getAttributes($attribute);
+            $attributes = new ReflectionClass($class)->getAttributes(ltrim($attribute, '\\'));
             if (count($attributes) > 1) {
                 throw new InvalidCommandMetadataException(sprintf(
                     'Command "%s" has repeated metadata attribute "%s"; only one instance is supported.',
