@@ -16,7 +16,7 @@ use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
  * @example
  * ```php
  * $collector = new LocatorCollector(
- *     fallback: $containerLocator,
+ *     $containerLocator,
  *     $billingLocator,
  *     $shippingLocator,
  * );
