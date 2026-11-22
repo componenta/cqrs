@@ -41,7 +41,9 @@ final readonly class BatchCommandBus implements CommandBusInterface
             }
 
             $commandClass = $command::class;
-            $commandAttributes = $attributes[$commandClass] ?? [];
+            $commandAttributes = array_key_exists($commandClass, $attributes)
+                ? $attributes[$commandClass]
+                : [];
 
             if (!is_array($commandAttributes)) {
                 throw new InvalidArgumentException(sprintf(
