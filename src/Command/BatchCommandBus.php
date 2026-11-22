@@ -25,7 +25,7 @@ final readonly class BatchCommandBus implements CommandBusInterface
      * Dispatches commands sequentially with attributes resolved by command class.
      *
      * @param iterable<object> $commands
-     * @param array<class-string, array<string, mixed>> $attributes
+     * @param array<class-string, mixed> $attributes Selected entries must contain arrays; validated before dispatch.
      * @return list<OperationInterface>
      */
     public function dispatchMany(iterable $commands, array $attributes = []): array

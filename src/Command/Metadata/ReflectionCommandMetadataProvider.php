@@ -11,6 +11,11 @@ use Throwable;
 
 final class ReflectionCommandMetadataProvider implements CommandMetadataProviderInterface
 {
+    /**
+     * @template T of object
+     * @param class-string<T> $attribute
+     * @return T|null
+     */
     public function get(object|string $command, string $attribute): ?object
     {
         try {
@@ -19,7 +24,9 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
             if (!class_exists($class)) {
                 return null;
             }
-            $attributes = new ReflectionClass($class)->getAttributes(ltrim($attribute, '\\'));
+            /** @var class-string<T> $normalizedAttribute */
+            $normalizedAttribute = ltrim($attribute, '\\');
+            $attributes = new ReflectionClass($class)->getAttributes($normalizedAttribute);
             if (count($attributes) > 1) {
                 throw new InvalidCommandMetadataException(sprintf(
                     'Command "%s" has repeated metadata attribute "%s"; only one instance is supported.',
