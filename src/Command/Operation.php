@@ -12,15 +12,25 @@ use Ramsey\Uuid\UuidInterface;
 
 final readonly class Operation implements OperationInterface
 {
+    /** @var array<string, mixed> */
+    public private(set) array $attributes;
+
     /** @param array<string, mixed> $attributes */
     public function __construct(
         public UuidInterface $id,
         public object $command,
         public DateTimeImmutable $createdAt,
-        private(set) array $attributes = [],
+        array $attributes = [],
         public ?OperationResult $result = null,
     ) {
         self::assertAttributes($attributes);
+
+        // Prevent a PHP reference in a caller-owned array from mutating an operation.
+        $snapshot = [];
+        foreach ($attributes as $name => $value) {
+            $snapshot[$name] = $value;
+        }
+        $this->attributes = $snapshot;
     }
 
     /** @param array<string, mixed> $attributes */

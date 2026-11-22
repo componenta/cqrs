@@ -14,10 +14,20 @@ use InvalidArgumentException;
  */
 final readonly class Context implements ContextInterface
 {
+    /** @var array<string, mixed> */
+    public array $attributes;
+
     /** @param array<string, mixed> $attributes */
-    public function __construct(public array $attributes = [])
+    public function __construct(array $attributes = [])
     {
         self::assertAttributes($attributes);
+
+        // Rebuild the outer array to detach references supplied by the caller.
+        $snapshot = [];
+        foreach ($attributes as $name => $value) {
+            $snapshot[$name] = $value;
+        }
+        $this->attributes = $snapshot;
     }
 
     public function getAttribute(string $name, mixed $default = null): mixed
