@@ -55,7 +55,7 @@ $operations = $batch->dispatchMany([
 ]);
 ```
 
-Каждая команда независимо проходит wrapped bus и получает собственную operation. `SequentialMiddleware` удалён; nested `dispatch()` имеет обычную reentrant-семантику. Если действие должно произойти после текущей команды или транзакции, используйте явный event, outbox, async transport или workflow/process manager.
+Каждая команда независимо проходит wrapped bus и получает собственную operation. Явное значение `null` (как и любое не-массивное значение) для атрибутов выбранного класса отклоняется до отправки первой команды; отсутствие записи означает `[]`. Batch выполняется последовательно и не обеспечивает транзакционности. `SequentialMiddleware` удалён; nested `dispatch()` имеет обычную reentrant-семантику. Если действие должно произойти после текущей команды или транзакции, используйте явный event, outbox, async transport или workflow/process manager.
 
 ## Command middleware
 
@@ -104,13 +104,15 @@ README optional-пакетов описывают рекомендуемые к�
 
 Ошибки listeners по умолчанию распространяются. Положение `EventMiddleware` относительно policy, transport, retry, lock, transaction и пользовательских middleware определяется конфигурацией приложения.
 
+**Retry и ошибки уведомления.** При порядке `Retry → Event → handler` ошибка `CommandProcessedEvent` может вызвать повторный запуск уже успешно отработавшего handler. При `Event → Retry → handler` события относятся ко всему dispatch, а не к отдельным попыткам; промежуточные ошибки, устранённые внутренним retry, не создают внешний `CommandFailedEvent`. Ни один порядок не гарантирует идемпотентности. Приложению нужны выбранная семантика retry/transaction и, при необходимости, ключ идемпотентности либо транзакционный outbox. См. [план](docs/plans/cqrs-operation-lifecycle-contracts.md).
+
 ## Queries
 
 ```php
 $result = $queries->handle(new GetUserQuery($id));
 ```
 
-`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` нормализует array context в immutable `Context`. Ключи query context подчиняются тому же non-empty string-key контракту, что и operation attributes.
+`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` нормализует array context в immutable `Context`. Ключи query context подчиняются тому же non-empty string-key контракту, что и operation attributes. Встроенные `Context` и `Operation` отсоединяют PHP-ссылки верхнего уровня; вложенные объекты и ресурсы не клонируются глубоко.
 
 ## Регистрация и карты
 
@@ -181,7 +183,9 @@ Retry, lock и transport используют этот провайдер. До�
 #[Componenta\CQRS\Query\Attribute\AsQueryHandler]
 ```
 
-Message handler должен занимать первый parameter slot. Дополнительные обязательные параметры handler не dependency-inject-ятся CQRS runtime.
+Message handler должен занимать первый parameter slot. CQRS передаёт этот аргумент и делегирует вызов настроенному `CallableInvokerInterface`. Стандартный `CallableInvoker` не внедряет отсутствующие аргументы; DI-aware реализация может добавить зависимости. Поиск обработчиков по атрибутам сам инъекцию не выполняет.
+
+Для строкового имени функции терминальный обработчик передаёт invoker объект `Closure`, для статического `Class::method` — callable-массив. Так сохраняются выбранный обработчик и область проверки доступа к методу. Пользовательский invoker, который анализирует представление callable, должен учитывать нормализацию. Для именованных функций создание нового `Closure` при каждом вызове может увеличивать затраты reflection-based DI.
 
 ## Дополнительные пакеты
 

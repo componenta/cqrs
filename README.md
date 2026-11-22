@@ -55,7 +55,7 @@ $operations = $batch->dispatchMany([
 ]);
 ```
 
-Each command is dispatched independently through the wrapped bus and receives its own operation. Core no longer contains `SequentialMiddleware`; nested `dispatch()` calls use normal reentrant dispatch semantics. Work that must happen after the current command or transaction should use an explicit event, outbox, async transport, or workflow/process manager.
+Each command is dispatched independently through the wrapped bus and receives its own operation. Explicit `null` (or any non-array value) for a selected class's attributes is rejected before any command runs; a missing class entry defaults to `[]`. Batch execution is sequential, not transactional. Core no longer contains `SequentialMiddleware`; nested `dispatch()` calls use normal reentrant dispatch semantics. Work that must happen after the current command or transaction should use an explicit event, outbox, async transport, or workflow/process manager.
 
 ## Command middleware
 
@@ -104,13 +104,15 @@ Optional package documentation describes useful ordering patterns and their cons
 
 Listener failures propagate by default. The position of `EventMiddleware` relative to policy, transport, retry, lock, transaction, or custom middleware is application-defined.
 
+**Retry and notification failures.** With `Retry → Event → handler`, a retry policy that retries an error from `CommandProcessedEvent` may execute an already successful handler again. With `Event → Retry → handler`, events describe the entire dispatch, rather than each inner attempt; failures recovered by the inner retry do not create an outer `CommandFailedEvent`. Neither arrangement provides idempotency by itself. Applications must choose retry/transaction ordering and use idempotency keys or a transactional outbox where required. See [operation-lifecycle design notes](docs/plans/cqrs-operation-lifecycle-contracts.md).
+
 ## Queries
 
 ```php
 $result = $queries->handle(new GetUserQuery($id));
 ```
 
-`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` normalizes array context to immutable `Context`. Query context attributes use the same non-empty string-key invariant as operation attributes.
+`QueryBusInterface::handle(object $query, ContextInterface|array $context = [])` normalizes array context to immutable `Context`. Query context attributes use the same non-empty string-key invariant as operation attributes. The built-in `Context` and `Operation` detach top-level PHP references from caller-owned attribute arrays; nested objects and resources are not deep-cloned.
 
 ## Registration and maps
 
@@ -181,7 +183,9 @@ Retry, lock and transport middleware use this provider. Their attributes need no
 #[Componenta\CQRS\Query\Attribute\AsQueryHandler]
 ```
 
-A handler's message must occupy the first parameter slot. Additional required handler parameters are not dependency-injected by the CQRS runtime.
+A handler's message must occupy the first parameter slot. CQRS supplies that argument and delegates invocation to the configured `CallableInvokerInterface`. The default `CallableInvoker` does not inject missing arguments; a DI-aware custom invoker may supply additional dependencies. Attribute discovery itself does not perform argument injection.
+
+For string-form handlers, CQRS preserves the selected target against a second service lookup: a named function is passed to the invoker as a `Closure`; a static `Class::method` callable becomes `[Class::class, 'method']`, preserving access checks in the invoker's scope. Custom invokers that inspect the raw callable representation must account for this normalization. Creating a `Closure` for a named function on every dispatch can add overhead with reflection-based DI invokers.
 
 ## Optional packages
 
