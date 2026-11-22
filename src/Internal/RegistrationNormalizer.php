@@ -165,7 +165,14 @@ final class RegistrationNormalizer
         } catch (InvalidArgumentException $exception) {
             throw new InvalidCqrsMapException($context . ': ' . $exception->getMessage(), previous: $exception);
         }
-        $events = array_values(array_unique($listener['events']));
+        // array_unique()/array_values() preserve references from input arrays.
+        // Copy each event value so a configured map is not externally mutable.
+        $events = [];
+        foreach ($listener['events'] as $eventType) {
+            if (!in_array($eventType, $events, true)) {
+                $events[] = $eventType;
+            }
+        }
         sort($events);
         return ['service' => $service, 'events' => $events, 'priority' => $listener['priority']];
     }

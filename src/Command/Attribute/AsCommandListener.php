@@ -13,6 +13,9 @@ use InvalidArgumentException;
 #[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
 final readonly class AsCommandListener
 {
+    /** @var list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> */
+    public array $eventTypes;
+
     /**
      * @param non-empty-string $command Command class or logical command name.
      * @param list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes
@@ -20,7 +23,7 @@ final readonly class AsCommandListener
     public function __construct(
         public string $command,
         public int $priority = 0,
-        public array $eventTypes = [],
+        array $eventTypes = [],
     ) {
         if (trim($this->command) === '') {
             throw new InvalidArgumentException(
@@ -28,7 +31,12 @@ final readonly class AsCommandListener
             );
         }
 
-        self::assertEventTypes($this->eventTypes);
+        self::assertEventTypes($eventTypes);
+        $snapshot = [];
+        foreach ($eventTypes as $eventType) {
+            $snapshot[] = $eventType;
+        }
+        $this->eventTypes = $snapshot;
     }
 
     /**
