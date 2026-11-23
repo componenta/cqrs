@@ -19,16 +19,6 @@ final readonly class HandleQuery
 
     public function __invoke(object $query): mixed
     {
-        $handler = $this->locator->locateFor($query);
-
-        // Avoid a second DI service lookup by callable string name.
-        // Keep private/protected static method visibility in invoker scope.
-        if (is_string($handler)) {
-            $handler = str_contains($handler, '::')
-                ? explode('::', $handler, 2)
-                : Closure::fromCallable($handler);
-        }
-
-        return $this->invoker->call($handler, [$query]);
+        return $this->invoker->call($this->locator->locateFor($query), [$query]);
     }
 }
