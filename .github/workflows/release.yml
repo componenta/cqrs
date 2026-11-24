@@ -41,6 +41,22 @@ jobs:
       - run: composer show componenta/di
       - run: composer test
       - run: composer analyse
+      - name: Measure baseline and candidate with the same dependencies
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'perf:')
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          mkdir -p "$RUNNER_TEMP/cqrs-baseline"
+          git archive "$BASE_SHA" src | tar -x -C "$RUNNER_TEMP/cqrs-baseline"
+          echo '=== Baseline source ==='
+          CQRS_BENCH_SOURCE="$RUNNER_TEMP/cqrs-baseline/src" composer bench
+          echo '=== Candidate source ==='
+          composer bench
+      - name: Verify benchmark suite
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'bench:')
+        run: composer bench
 
   publish:
     if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release v')

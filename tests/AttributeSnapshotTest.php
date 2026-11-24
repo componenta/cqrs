@@ -51,3 +51,47 @@ it('preserves identity of object attribute values without deep-cloning them', fu
     expect($context->getAttribute('object'))->toBe($object)
         ->and($operation->attributes['object'])->toBe($object);
 });
+
+
+it('preserves attribute order and shallow value identity across completed operation copies', function (): void {
+    $value = 'original';
+    $nested = 'nested';
+    $object = new stdClass();
+    $attributes = ['ref' => &$value, 'object' => $object, 'nested' => ['ref' => &$nested], 'null' => null];
+    $command = new stdClass();
+    $original = Operation::create($command, $attributes);
+    $result = new \Componenta\CQRS\Command\OperationResult(null);
+    $completed = $original->withResult($result);
+    $changed = $completed->withAttribute('ref', 'replacement');
+    $removed = $changed->withoutAttribute('null');
+    $value = 'changed';
+    $nested = 'shared';
+
+    expect($completed)->not->toBe($original)
+        ->and($completed->id)->toBe($original->id)
+        ->and($completed->createdAt)->toBe($original->createdAt)
+        ->and($completed->command)->toBe($command)
+        ->and($original->result)->toBeNull()
+        ->and($completed->result)->toBe($result)
+        ->and($changed->result)->toBe($result)
+        ->and($removed->result)->toBe($result)
+        ->and(array_keys($changed->attributes))->toBe(['ref', 'object', 'nested', 'null'])
+        ->and($completed->attributes)->toBe(['ref' => 'original', 'object' => $object, 'nested' => ['ref' => 'shared'], 'null' => null])
+        ->and($removed->attributes)->toBe(['ref' => 'replacement', 'object' => $object, 'nested' => ['ref' => 'shared']])
+        ->and($removed->withoutAttribute('absent'))->not->toBe($removed);
+});
+
+it('retains shallow context semantics and creates distinct instances for no-op copies', function (): void {
+    $value = 'original';
+    $object = new stdClass();
+    $context = new Context(['key' => &$value, 'object' => $object, 'null' => null]);
+    $next = $context->withAttribute('key', 'replacement');
+    $without = $context->withoutAttribute('absent');
+    $value = 'changed';
+
+    expect($next->attributes)->toBe(['key' => 'replacement', 'object' => $object, 'null' => null])
+        ->and($context->attributes)->toBe(['key' => 'original', 'object' => $object, 'null' => null])
+        ->and($without)->not->toBe($context)
+        ->and($without->attributes)->toBe($context->attributes)
+        ->and($context->withAttributes($context->attributes))->not->toBe($context);
+});
