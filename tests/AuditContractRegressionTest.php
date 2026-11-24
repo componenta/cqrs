@@ -12,18 +12,25 @@ use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
-use Componenta\CQRS\Internal\RegistrationNormalizer;
+use Componenta\Config\Config;
+use Componenta\Config\ContainerValue;
+use Componenta\Config\Environment;
+use Componenta\CQRS\Command\Locator\CommandListenersLocator;
+use Componenta\CQRS\Factory\CqrsMapsFactory;
+use Componenta\CQRS\Tests\Fixture\FakeContainer;
+use Psr\Container\ContainerInterface;
 use Componenta\CQRS\Map\Exception\CqrsMapConflictException;
 
-it('rejects conflicting methods on the same service for commands and queries', function (): void {
+it('rejects conflicting methods on the same registered handler service', function (string $section): void {
     $first = ['message' => 'message', 'service' => 'same.service', 'method' => 'handleA'];
     $second = ['message' => 'message', 'service' => 'same.service', 'method' => 'handleB'];
+    $container = new ContainerValue(new FakeContainer([]), new Config([
+        $section => [$first, $second],
+    ], new Environment([])));
 
-    expect(fn () => RegistrationNormalizer::registrations([$first, $second]))
-        ->toThrow(CqrsMapConflictException::class)
-        ->and(fn () => RegistrationNormalizer::registrations(queries: [$first, $second]))
+    expect(fn () => (new CqrsMapsFactory())($container))
         ->toThrow(CqrsMapConflictException::class);
-});
+})->with(['cqrs.command_handlers', 'cqrs.query_handlers']);
 
 it('rethrows the identical handler failure after failed-event notification', function (): void {
     $primary = new RuntimeException('failed in command handler');
@@ -64,7 +71,7 @@ it('rethrows the identical handler failure after failed-event notification', fun
     }
 });
 
-it('stops resolving later process listeners when propagation is stopped', function (): void {
+it('does not resolve later listeners after propagation of the current event is stopped', function (): void {
     $calls = new ArrayObject();
     $first = new readonly class implements CommandListenerInterface {
         public function handleEvent(
@@ -77,24 +84,43 @@ it('stops resolving later process listeners when propagation is stopped', functi
     };
     $second = new readonly class ($calls) implements CommandListenerInterface {
         public function __construct(private ArrayObject $calls) {}
+
         public function handleEvent(
             CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
         ): void {
             $this->calls->append($event::class);
         }
     };
-    $locator = new readonly class ($first, $second) implements CommandListenersLocatorInterface {
+    $container = new class ($first, $second) implements ContainerInterface {
+        public array $resolved = [];
+
         public function __construct(
-            private CommandListenerInterface $first,
-            private CommandListenerInterface $second,
+            private readonly CommandListenerInterface $first,
+            private readonly CommandListenerInterface $second,
         ) {}
-        public function locateFor(
-            CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
-        ): iterable {
-            yield $this->first;
-            yield $this->second;
+
+        public function get(string $id): mixed
+        {
+            $this->resolved[] = $id;
+
+            return match ($id) {
+                'first' => $this->first,
+                'second' => $this->second,
+                default => throw new RuntimeException($id),
+            };
+        }
+
+        public function has(string $id): bool
+        {
+            return in_array($id, ['first', 'second'], true);
         }
     };
+    $locator = new CommandListenersLocator([
+        stdClass::class => [
+            ['service' => 'first', 'priority' => 10],
+            ['service' => 'second'],
+        ],
+    ], $container);
     $handler = new readonly class implements OperationHandlerInterface {
         public function handle(OperationInterface $operation): OperationInterface
         {
@@ -105,5 +131,6 @@ it('stops resolving later process listeners when propagation is stopped', functi
     $result = (new EventMiddleware($locator))->execute(Operation::create(new stdClass()), $handler);
 
     expect($result->result?->value)->toBe('ok')
-        ->and($calls->getArrayCopy())->toBe([CommandProcessedEvent::class]);
+        ->and($calls->getArrayCopy())->toBe([CommandProcessedEvent::class])
+        ->and($container->resolved)->toBe(['first', 'first', 'second']);
 });
