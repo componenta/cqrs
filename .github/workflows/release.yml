@@ -12,11 +12,15 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.5', '8.6']
     steps:
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.5'
+          php-version: ${{ matrix.php }}
           coverage: none
           tools: composer:v2
       - run: composer validate --strict
@@ -42,21 +46,33 @@ jobs:
       - run: composer test
       - run: composer analyse
       - name: Measure baseline and candidate with the same dependencies
-        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'perf:')
+        if: matrix.php == '8.5' && github.event_name == 'push' && startsWith(github.event.head_commit.message, 'perf:')
         shell: bash
         env:
           BASE_SHA: ${{ github.event.before }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          # A benchmark-base trailer can select an older, compatible source revision.
+          override="$(printf '%s\\n' "$COMMIT_MESSAGE" | sed -nE 's/^Benchmark-base: ([0-9a-f]{40})$/\\1/p')"
+          if [ -n "$override" ]; then BASE_SHA="$override"; fi
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           mkdir -p "$RUNNER_TEMP/cqrs-baseline"
           git archive "$BASE_SHA" src | tar -x -C "$RUNNER_TEMP/cqrs-baseline"
           echo '=== Baseline source ==='
-          CQRS_BENCH_SOURCE="$RUNNER_TEMP/cqrs-baseline/src" composer bench
+          set -o pipefail
+          CQRS_BENCH_SOURCE="$RUNNER_TEMP/cqrs-baseline/src" composer bench | tee "$RUNNER_TEMP/cqrs-baseline.log"
+          php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-baseline.log"
           echo '=== Candidate source ==='
-          composer bench
+          composer bench | tee "$RUNNER_TEMP/cqrs-candidate.log"
+          php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-candidate.log"
       - name: Verify benchmark suite
-        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'bench:')
-        run: composer bench
+        if: matrix.php == '8.5' && github.event_name == 'push' && startsWith(github.event.head_commit.message, 'bench:')
+        shell: bash
+        run: |
+          set -o pipefail
+          composer bench | tee "$RUNNER_TEMP/cqrs-benchmark.log"
+          php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-benchmark.log"
 
   publish:
     if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release v')

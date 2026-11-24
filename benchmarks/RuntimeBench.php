@@ -25,61 +25,6 @@ use Componenta\CQRS\Query\QueryBusInterface;
 use Componenta\DI\ContainerFactory;
 use PhpBench\Attributes as Bench;
 
-final readonly class RuntimeBenchMessage
-{
-    public function __construct(public int $value) {}
-}
-
-final readonly class RuntimeBenchDependency
-{
-    public function __construct(public int $offset = 1) {}
-}
-
-final readonly class RuntimeBenchHandler
-{
-    public function __invoke(RuntimeBenchMessage $message, RuntimeBenchDependency $dependency): int
-    {
-        return $message->value + $dependency->offset;
-    }
-}
-
-final readonly class RuntimeBenchListener implements CommandListenerInterface
-{
-    public function handleEvent(CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event): void
-    {
-    }
-}
-
-final class RuntimeBenchProvider extends BaseProvider
-{
-    public function __construct(private readonly bool $events) {}
-
-    protected function getConfig(): array
-    {
-        return [
-            ConfigKey::COMMAND_HANDLERS => [
-                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchHandler::class, 'method' => '__invoke'],
-            ],
-            ConfigKey::QUERY_HANDLERS => [
-                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchHandler::class, 'method' => '__invoke'],
-            ],
-            ConfigKey::COMMAND_LISTENERS => [
-                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchListener::class, 'events' => [CommandProcessedEvent::class]],
-            ],
-            ConfigKey::COMMAND_MIDDLEWARES => $this->events ? [EventMiddleware::class] : [],
-        ];
-    }
-
-    protected function getServices(): array
-    {
-        return [
-            RuntimeBenchHandler::class => new RuntimeBenchHandler(),
-            RuntimeBenchDependency::class => new RuntimeBenchDependency(),
-            RuntimeBenchListener::class => new RuntimeBenchListener(),
-        ];
-    }
-}
-
 #[Bench\Iterations(7)]
 #[Bench\Revs(2000)]
 #[Bench\Warmup(100)]
@@ -184,5 +129,60 @@ final class RuntimeBench
         $container = (new ContainerFactory())->create($composition->config, $composition->dependencies)->container;
         $container->get(CommandBusInterface::class);
         $container->get(QueryBusInterface::class);
+    }
+}
+
+final readonly class RuntimeBenchMessage
+{
+    public function __construct(public int $value) {}
+}
+
+final readonly class RuntimeBenchDependency
+{
+    public function __construct(public int $offset = 1) {}
+}
+
+final readonly class RuntimeBenchHandler
+{
+    public function __invoke(RuntimeBenchMessage $message, RuntimeBenchDependency $dependency): int
+    {
+        return $message->value + $dependency->offset;
+    }
+}
+
+final readonly class RuntimeBenchListener implements CommandListenerInterface
+{
+    public function handleEvent(CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event): void
+    {
+    }
+}
+
+final class RuntimeBenchProvider extends BaseProvider
+{
+    public function __construct(private readonly bool $events) {}
+
+    protected function getConfig(): array
+    {
+        return [
+            ConfigKey::COMMAND_HANDLERS => [
+                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchHandler::class, 'method' => '__invoke'],
+            ],
+            ConfigKey::QUERY_HANDLERS => [
+                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchHandler::class, 'method' => '__invoke'],
+            ],
+            ConfigKey::COMMAND_LISTENERS => [
+                ['message' => RuntimeBenchMessage::class, 'service' => RuntimeBenchListener::class, 'events' => [CommandProcessedEvent::class]],
+            ],
+            ConfigKey::COMMAND_MIDDLEWARES => $this->events ? [EventMiddleware::class] : [],
+        ];
+    }
+
+    protected function getServices(): array
+    {
+        return [
+            RuntimeBenchHandler::class => new RuntimeBenchHandler(),
+            RuntimeBenchDependency::class => new RuntimeBenchDependency(),
+            RuntimeBenchListener::class => new RuntimeBenchListener(),
+        ];
     }
 }

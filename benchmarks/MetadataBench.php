@@ -9,15 +9,6 @@ use Componenta\CQRS\Command\Metadata\ReflectionCommandMetadataProvider;
 use PhpBench\Attributes as Bench;
 use stdClass;
 
-#[Attribute(Attribute::TARGET_CLASS)]
-final class MetadataBenchAttribute
-{
-    public function __construct(public object $payload) {}
-}
-
-#[MetadataBenchAttribute(new stdClass())]
-final class MetadataBenchCommand {}
-
 #[Bench\Iterations(7)]
 #[Bench\Revs(10000)]
 #[Bench\Warmup(100)]
@@ -70,3 +61,12 @@ final class MetadataBench
         $this->provider->get('CqrsBenchmarkUnavailableCommand', MetadataBenchAttribute::class);
     }
 }
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class MetadataBenchAttribute
+{
+    public function __construct(public object $payload) {}
+}
+
+#[MetadataBenchAttribute(new stdClass())]
+final class MetadataBenchCommand {}
