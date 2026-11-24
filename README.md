@@ -154,7 +154,7 @@ $locator = new \Componenta\CQRS\Command\Locator\CommandHandlerLocator([
 
 $command = new CreateUserCommand($email);
 $handler = $locator->locateFor($command);
-$handler($command);
+$handler($command); // Direct call when no additional arguments are required.
 ```
 
 Identical handler registrations collapse; different handlers for one name throw `CqrsMapConflictException`. Identical explicit listener registrations throw `InvalidCqrsMapException`. Listeners run by descending priority, then service ID and canonical event list. An empty event list matches every command lifecycle event.

@@ -154,7 +154,7 @@ $locator = new \Componenta\CQRS\Command\Locator\CommandHandlerLocator([
 
 $command = new CreateUserCommand($email);
 $handler = $locator->locateFor($command);
-$handler($command);
+$handler($command); // Прямой вызов, если не требуются дополнительные аргументы.
 ```
 
 Одинаковые регистрации обработчика объединяются. Разные обработчики одного имени вызывают `CqrsMapConflictException`; повтор одинаковой явной регистрации слушателя — `InvalidCqrsMapException`. Слушатели выполняются по убыванию приоритета, затем по ID сервиса и каноническому списку событий. Пустой список событий означает все события жизненного цикла команды.

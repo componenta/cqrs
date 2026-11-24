@@ -7,7 +7,8 @@ namespace Componenta\CQRS\Query\Context;
 /**
  * Immutable key-value context propagated through the query middleware chain.
  *
- * Carries per-dispatch data (skip flags, actor overrides, request metadata).
+ * Carries per-dispatch attributes for query middleware. Their interpretation
+ * belongs to the middleware that uses them.
  * All mutation-like methods return a new instance.
  */
 interface ContextInterface

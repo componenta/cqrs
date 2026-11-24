@@ -32,9 +32,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
     }
 
     /**
-     * @template T of object
-     * @param T $command
-     * @return callable(T): mixed
+     * @inheritDoc
      *
      * @throws HandlerNotFoundException
      * @throws InvalidHandlerException

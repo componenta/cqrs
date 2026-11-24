@@ -11,9 +11,9 @@ interface QueryHandlerLocatorInterface
     /**
      * Locate handler for a given query.
      *
-     * @template T of object
-     * @param T $query
-     * @return callable(T): mixed
+     * The first parameter accepts the query. Additional arguments may be
+     * required by the handler and resolved by the configured invoker.
+     *
      *
      * @throws HandlerNotFoundException
      */

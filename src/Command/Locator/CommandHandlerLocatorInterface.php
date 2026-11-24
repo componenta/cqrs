@@ -14,9 +14,8 @@ interface CommandHandlerLocatorInterface
     /**
      * Locates handler for the given command.
      *
-     * @template T of object
-     * @param T $command Command to find handler for
-     * @return callable(T): mixed Handler callable
+     * The first parameter accepts the command. Additional arguments may be
+     * required by the handler and resolved by the configured invoker.
      *
      * @throws HandlerNotFoundException If handler not found
      */

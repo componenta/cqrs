@@ -43,9 +43,7 @@ final readonly class LocatorCollector implements CommandHandlerLocatorInterface
     }
 
     /**
-     * @template T of object
-     * @param T $command
-     * @return callable(T): mixed
+     * @inheritDoc
      *
      * @throws HandlerNotFoundException if handler for command not found
      */
