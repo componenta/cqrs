@@ -23,11 +23,14 @@ final readonly class Context implements ContextInterface
      */
     public function __construct(array $attributes = [])
     {
-        self::assertAttributes($attributes);
-
-        // Rebuild the outer array to detach references supplied by the caller.
+        // Copy top-level values, detaching PHP references while validating keys.
         $snapshot = [];
         foreach ($attributes as $name => $value) {
+            if (!is_string($name) || trim($name) === '') {
+                throw new InvalidArgumentException(
+                    'Query context attribute names must be non-empty strings.',
+                );
+            }
             $snapshot[$name] = $value;
         }
         $this->attributes = $snapshot;
@@ -65,18 +68,6 @@ final readonly class Context implements ContextInterface
         unset($attributes[$name]);
 
         return new self($attributes);
-    }
-
-    /** @param array<array-key, mixed> $attributes */
-    private static function assertAttributes(array $attributes): void
-    {
-        foreach ($attributes as $name => $_) {
-            if (!is_string($name) || trim($name) === '') {
-                throw new InvalidArgumentException(
-                    'Query context attribute names must be non-empty strings.',
-                );
-            }
-        }
     }
 
     private static function assertAttributeName(string $name): void

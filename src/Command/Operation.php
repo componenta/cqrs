@@ -26,11 +26,14 @@ final readonly class Operation implements OperationInterface
         array $attributes = [],
         public ?OperationResult $result = null,
     ) {
-        self::assertAttributes($attributes);
-
-        // Prevent a PHP reference in a caller-owned array from mutating an operation.
+        // Copy top-level values, detaching PHP references while validating keys.
         $snapshot = [];
         foreach ($attributes as $name => $value) {
+            if (!is_string($name) || trim($name) === '') {
+                throw new InvalidArgumentException(
+                    'Operation attribute names must be non-empty strings.',
+                );
+            }
             $snapshot[$name] = $value;
         }
         $this->attributes = $snapshot;
@@ -56,13 +59,7 @@ final readonly class Operation implements OperationInterface
             throw new \RuntimeException('Operation already has result');
         }
 
-        return new self(
-            id: $this->id,
-            command: $this->command,
-            createdAt: $this->createdAt,
-            attributes: $this->attributes,
-            result: $result,
-        );
+        return clone($this, ['result' => $result]);
     }
 
     public function withAttributes(array $attributes): OperationInterface
@@ -103,18 +100,6 @@ final readonly class Operation implements OperationInterface
             attributes: $attributes,
             result: $this->result,
         );
-    }
-
-    /** @param array<array-key, mixed> $attributes */
-    private static function assertAttributes(array $attributes): void
-    {
-        foreach ($attributes as $name => $_) {
-            if (!is_string($name) || trim($name) === '') {
-                throw new InvalidArgumentException(
-                    'Operation attribute names must be non-empty strings.',
-                );
-            }
-        }
     }
 
     private static function assertAttributeName(string $name): void
