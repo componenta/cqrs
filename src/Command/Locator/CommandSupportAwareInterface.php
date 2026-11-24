@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Locator;
 
-/**
- * Indicates locator can check command support before locating.
- *
- * Used by composite locators to find appropriate delegate.
- */
+use Throwable;
+
+/** Capability check for a locator used in composite handler selection. */
 interface CommandSupportAwareInterface
 {
     /**
-     * Checks if this locator supports the given command.
+     * Returns whether the locator owns the given command.
      *
-     * @param object $command Command to check
-     * @return bool True if locator can locate handler for this command
+     * False is normal and permits the caller to try another locator. True
+     * does not guarantee that service resolution or handler execution will
+     * succeed. Checking support must not instantiate or invoke the handler.
+     * Evaluate the message instance, not only its PHP class.
+     *
+     * @throws Throwable If checking support fails for reasons other than lack of support.
      */
     public function supports(object $command): bool;
 }
