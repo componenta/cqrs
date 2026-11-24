@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\CommandBus;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
@@ -31,7 +32,7 @@ final class LifecycleSequenceClock implements ClockInterface
     }
 }
 
-function lifecycleClockHandler(Closure $callback, ?ClockInterface $clock = null): HandleCommandHandler
+function lifecycleClockHandler(Closure $callback, ClockInterface $clock = new UtcClock()): HandleCommandHandler
 {
     $locator = new readonly class ($callback) implements CommandHandlerLocatorInterface {
         public function __construct(private Closure $callback) {}
@@ -40,7 +41,7 @@ function lifecycleClockHandler(Closure $callback, ?ClockInterface $clock = null)
     return new HandleCommandHandler($locator, clock: $clock);
 }
 
-function lifecycleClockMiddleware(Closure $callback, ?ClockInterface $clock = null, bool $suppress = false): EventMiddleware
+function lifecycleClockMiddleware(Closure $callback, ClockInterface $clock = new UtcClock(), bool $suppress = false): EventMiddleware
 {
     $listener = new readonly class ($callback) implements CommandListenerInterface {
         public function __construct(private Closure $callback) {}

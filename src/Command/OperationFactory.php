@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Exception\InvalidArgumentException;
 use Componenta\Identity\UuidFactory;
 use Componenta\Identity\UuidFactoryInterface;
-use DateTimeImmutable;
-use DateTimeZone;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -23,7 +22,7 @@ use Psr\Clock\ClockInterface;
 final readonly class OperationFactory implements OperationFactoryInterface
 {
     public function __construct(
-        private ?ClockInterface $clock = null,
+        private ClockInterface $clock = new UtcClock(),
         private UuidFactoryInterface $uuidFactory = new UuidFactory(),
     ) {}
 
@@ -41,7 +40,7 @@ final readonly class OperationFactory implements OperationFactoryInterface
         return Operation::create(
             command: $command,
             attributes: $attributes,
-            createdAt: $this->clock?->now() ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            createdAt: $this->clock->now(),
             id: $this->uuidFactory->generate(),
         );
     }

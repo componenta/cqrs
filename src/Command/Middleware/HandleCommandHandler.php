@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Middleware;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
@@ -18,7 +19,7 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
     public function __construct(
         private CommandHandlerLocatorInterface $locator,
         private CallableInvokerInterface $invoker = new CallableInvoker(),
-        private ?ClockInterface $clock = null,
+        private ClockInterface $clock = new UtcClock(),
     ) {
     }
 
@@ -40,7 +41,7 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
         $value = $this->invoker->call($handler, [$operation->command]);
 
         return $operation->withResult(
-            new OperationResult($value, processedAt: $this->clock?->now()),
+            new OperationResult($value, processedAt: $this->clock->now()),
         );
     }
 }

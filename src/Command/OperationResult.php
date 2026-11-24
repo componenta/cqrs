@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Clock\UtcClock;
 use DateTimeImmutable;
-use DateTimeZone;
 
 /**
  * Result of completed operation.
@@ -22,6 +22,6 @@ final readonly class OperationResult
         public mixed $value,
         ?DateTimeImmutable $processedAt = null,
     ) {
-        $this->processedAt = $processedAt ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $this->processedAt = $processedAt ?? (new UtcClock())->now();
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Middleware;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\Exception\CommandFailureNotificationException;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
@@ -23,7 +24,7 @@ final readonly class EventMiddleware implements MiddlewareInterface
     public function __construct(
         private CommandListenersLocatorInterface $locator,
         private bool $suppressExceptions = false,
-        private ?ClockInterface $clock = null,
+        private ClockInterface $clock = new UtcClock(),
     ) {}
 
     /**

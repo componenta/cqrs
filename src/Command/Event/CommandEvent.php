@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Event;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\OperationInterface;
 use DateTimeImmutable;
-use DateTimeZone;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -32,7 +32,7 @@ class CommandEvent
     }
 
     /**
-     * Timestamp of when this event was instantiated (UTC without a clock).
+     * Timestamp of when this event was instantiated (UTC with the default clock).
      *
      * Useful for auditing dispatch timing. Wall-clock values are not monotonic.
      */
@@ -52,9 +52,9 @@ class CommandEvent
      */
     public function __construct(
         public readonly OperationInterface $operation,
-        private readonly ?ClockInterface $clock = null,
+        private readonly ClockInterface $clock = new UtcClock(),
     ) {
-        $this->dispatchedAt = $this->now();
+        $this->dispatchedAt = $this->clock->now();
     }
 
     /**
@@ -66,12 +66,8 @@ class CommandEvent
     public function stop(): void
     {
         if ($this->propagationStoppedAt === null) {
-            $this->propagationStoppedAt = $this->now();
+            $this->propagationStoppedAt = $this->clock->now();
         }
     }
 
-    private function now(): DateTimeImmutable
-    {
-        return $this->clock?->now() ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
-    }
 }

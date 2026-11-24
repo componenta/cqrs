@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Factory;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\Config\ContainerValue;
 use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\Middleware\EventMiddleware;
@@ -14,16 +15,16 @@ final class EventMiddlewareFactory
 {
     public function __invoke(ContainerValue $container): EventMiddleware
     {
-        $clock = null;
-        if ($container->has(ClockInterface::class)) {
-            $clock = $container->get(ClockInterface::class);
-            if (!$clock instanceof ClockInterface) {
-                throw new InvalidConfigurationException(sprintf(
-                    'Container entry "%s" must implement %s.',
-                    ClockInterface::class,
-                    ClockInterface::class,
-                ));
-            }
+        $clock = $container->has(ClockInterface::class)
+            ? $container->get(ClockInterface::class)
+            : new UtcClock();
+
+        if (!$clock instanceof ClockInterface) {
+            throw new InvalidConfigurationException(sprintf(
+                'Container entry "%s" must implement %s.',
+                ClockInterface::class,
+                ClockInterface::class,
+            ));
         }
 
         return new EventMiddleware(

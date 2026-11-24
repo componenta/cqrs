@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Factory;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Componenta\Identity\UuidFactory;
@@ -15,16 +16,16 @@ final class OperationFactoryFactory
 {
     public function __invoke(ContainerInterface $container): OperationFactory
     {
-        $clock = null;
-        if ($container->has(ClockInterface::class)) {
-            $clock = $container->get(ClockInterface::class);
-            if (!$clock instanceof ClockInterface) {
-                throw new InvalidConfigurationException(sprintf(
-                    'Container entry "%s" must implement %s.',
-                    ClockInterface::class,
-                    ClockInterface::class,
-                ));
-            }
+        $clock = $container->has(ClockInterface::class)
+            ? $container->get(ClockInterface::class)
+            : new UtcClock();
+
+        if (!$clock instanceof ClockInterface) {
+            throw new InvalidConfigurationException(sprintf(
+                'Container entry "%s" must implement %s.',
+                ClockInterface::class,
+                ClockInterface::class,
+            ));
         }
 
         $uuidFactory = $container->has(UuidFactoryInterface::class)

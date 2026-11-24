@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use DateTimeImmutable;
-use DateTimeZone;
 use Componenta\CQRS\Exception\InvalidArgumentException;
 use Componenta\Identity\UuidFactory;
 use Componenta\Identity\UuidInterface;
@@ -61,7 +61,7 @@ final readonly class Operation implements OperationInterface
         return new self(
             id: $id,
             command: $command,
-            createdAt: $createdAt ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            createdAt: $createdAt ?? (new UtcClock())->now(),
             attributes: $attributes,
         );
     }
