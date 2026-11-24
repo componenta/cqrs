@@ -20,10 +20,13 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
 
     public function supports(object $command): bool
     {
-        return array_any(
-            $this->resolvers,
-            static fn (CommandNameResolverInterface $resolver): bool => $resolver->supports($command),
-        ) || $this->fallback->supports($command);
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver->supports($command)) {
+                return true;
+            }
+        }
+
+        return $this->fallback->supports($command);
     }
 
     public function resolve(object $command): string

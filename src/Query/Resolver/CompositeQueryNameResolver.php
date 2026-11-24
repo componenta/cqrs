@@ -20,10 +20,13 @@ final class CompositeQueryNameResolver implements QueryNameResolverInterface
 
     public function supports(object $query): bool
     {
-        return array_any(
-            $this->resolvers,
-            static fn (QueryNameResolverInterface $resolver): bool => $resolver->supports($query),
-        ) || $this->fallback->supports($query);
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver->supports($query)) {
+                return true;
+            }
+        }
+
+        return $this->fallback->supports($query);
     }
 
     public function resolve(object $query): string
