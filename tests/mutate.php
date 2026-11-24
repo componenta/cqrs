@@ -13,9 +13,7 @@ if (filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOL)) {
 }
 
 $packageDirectory = dirname(__DIR__);
-$vendorDirectory = is_file($packageDirectory . '/vendor/autoload.php')
-    ? $packageDirectory . '/vendor'
-    : dirname($packageDirectory) . '/var-export/vendor';
+$vendorDirectory = $packageDirectory . '/vendor';
 require $vendorDirectory . '/autoload.php';
 $_SERVER['COLLISION_PRINTER'] = 'DefaultPrinter';
 $GLOBALS['_composer_bin_dir'] = $vendorDirectory . '/bin';
