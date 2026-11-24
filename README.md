@@ -25,6 +25,8 @@ An operation contains:
 - `attributes` with a strict `array<string,mixed>` contract;
 - optional `OperationResult`, whose `processedAt` records synchronous completion.
 
+A non-null `result` marks completion for every `OperationInterface` implementation, even if `result->value` is null. `withResult()` is single-assignment. The terminal command handler rejects a completed operation before looking up or invoking its handler. This guard does not provide distributed idempotency.
+
 `createdAt` is deliberately not named `startedAt`: operation creation happens before middleware and is not the same thing as handler execution start. Async transports must not restore producer `createdAt` as a worker execution timestamp.
 
 CQRS v4 keeps the operation factory separate from middleware composition:

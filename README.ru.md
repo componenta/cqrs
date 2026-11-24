@@ -25,6 +25,8 @@ Operation содержит:
 - `attributes` со строгим контрактом `array<string,mixed>`;
 - необязательный `OperationResult`, где `processedAt` фиксирует синхронное завершение.
 
+Ненулевой `result` означает завершение для любой реализации `OperationInterface`, даже если `result->value` равен `null`. Метод `withResult()` устанавливает результат только один раз. Терминальный обработчик отклоняет завершённую операцию до поиска и вызова обработчика команды. Эта проверка не обеспечивает распределённую идемпотентность.
+
 Поле называется именно `createdAt`, а не `startedAt`: operation создаётся до middleware и это не является моментом начала handler. Async transport не должен восстанавливать producer `createdAt` как время начала выполнения worker.
 
 В CQRS v4 operation factory отделён от middleware composition:

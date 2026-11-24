@@ -21,7 +21,10 @@ interface OperationInterface
     /** Timestamp when this operation object was created for dispatch. */
     public DateTimeImmutable $createdAt { get; }
 
-    /** Execution result or null when no synchronous result exists. */
+    /**
+     * Execution result or null when no synchronous result exists.
+     * A non-null result marks a completed operation, even when its value is null.
+     */
     public ?OperationResult $result { get; }
 
     /** Command associated with this operation. */
@@ -30,6 +33,11 @@ interface OperationInterface
     /** @var array<string, mixed> */
     public array $attributes { get; }
 
+    /**
+     * Returns a new operation with the result set.
+     *
+     * @throws \RuntimeException If this operation already has a result.
+     */
     public function withResult(OperationResult $result): OperationInterface;
 
     /** @param array<string, mixed> $attributes Complete replacement attributes. */
