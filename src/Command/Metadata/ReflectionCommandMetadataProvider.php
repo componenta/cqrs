@@ -6,11 +6,18 @@ namespace Componenta\CQRS\Command\Metadata;
 
 use Attribute;
 use Componenta\CQRS\Command\Exception\InvalidCommandMetadataException;
+use ReflectionAttribute;
 use ReflectionClass;
 use Throwable;
 
 final class ReflectionCommandMetadataProvider implements CommandMetadataProviderInterface
 {
+    private const int MAX_CACHED_LOOKUPS = 512;
+
+    /** @var array<string, array<string, ReflectionAttribute<object>|null>> */
+    private array $lookups = [];
+    private int $cachedLookups = 0;
+
     /**
      * @template T of object
      * @param class-string<T> $attribute
@@ -20,8 +27,15 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
     public function get(object|string $command, string $attribute): ?object
     {
         try {
-            self::assertAttributeClass($attribute);
             $class = is_object($command) ? $command::class : $command;
+            if (isset($this->lookups[$attribute]) && array_key_exists($class, $this->lookups[$attribute])) {
+                /** @var ReflectionAttribute<T>|null $cached */
+                $cached = $this->lookups[$attribute][$class];
+
+                return $cached?->newInstance();
+            }
+
+            self::assertAttributeClass($attribute);
             if (!class_exists($class)) {
                 return null;
             }
@@ -35,7 +49,17 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
                     $attribute,
                 ));
             }
-            return $attributes === [] ? null : $attributes[0]->newInstance();
+            $descriptor = $attributes[0] ?? null;
+
+            // Loaded class declarations cannot change. Cache only reflection
+            // metadata, never instantiated attributes or their arguments.
+            // An unavailable command class or invalid attribute is not cached.
+            if ($this->cachedLookups < self::MAX_CACHED_LOOKUPS) {
+                $this->lookups[$attribute][$class] = $descriptor;
+                ++$this->cachedLookups;
+            }
+
+            return $descriptor?->newInstance();
         } catch (InvalidCommandMetadataException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
