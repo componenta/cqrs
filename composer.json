@@ -1,6 +1,6 @@
 {
     "name": "componenta/cqrs",
-    "description": "CQRS (Command Query Responsibility Segregation) library for PHP 8.4+",
+    "description": "CQRS (Command Query Responsibility Segregation) library for PHP 8.5.13+",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -11,9 +11,9 @@
         "ddd"
     ],
     "require": {
-        "php": ">=8.4",
+        "php": "^8.5.13",
         "componenta/config": "^3.0.0",
-        "componenta/di": "^5.0.0",
+        "componenta/di": "^6.0",
         "componenta/reflection": "^2.0.1",
         "psr/container": "^2.0",
         "ramsey/uuid": "^4.7"
@@ -42,7 +42,7 @@
     "minimum-stability": "stable",
     "extra": {
         "branch-alias": {
-            "dev-main": "4.0.x-dev"
+            "dev-main": "5.0.x-dev"
         },
         "componenta": {
             "config-providers": [

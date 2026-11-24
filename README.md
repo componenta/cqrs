@@ -1,6 +1,6 @@
 # Componenta CQRS
 
-`componenta/cqrs` is the neutral CQRS runtime for PHP 8.4+. `main` is the CQRS v4 line.
+`componenta/cqrs` is the neutral CQRS runtime for PHP 8.5.13+ with Componenta DI 6.
 
 ```bash
 composer require componenta/cqrs
@@ -29,7 +29,7 @@ A non-null `result` marks completion for every `OperationInterface` implementati
 
 `createdAt` is deliberately not named `startedAt`: operation creation happens before middleware and is not the same thing as handler execution start. Async transports must not restore producer `createdAt` as a worker execution timestamp.
 
-CQRS v4 keeps the operation factory separate from middleware composition:
+CQRS keeps the operation factory separate from middleware composition:
 
 ```php
 $bus = new Componenta\CQRS\Command\CommandBus(
@@ -118,7 +118,7 @@ $result = $queries->handle(new GetUserQuery($id));
 
 ## Registration and maps
 
-The core package uses arrays and does not scan application classes or read cache files. It requires Config 3 and DI 5. Packages and applications append registration lists through their ConfigProvider:
+The core package uses arrays and does not scan application classes or read cache files. It requires Config 3 and DI 6. Packages and applications append registration lists through their ConfigProvider:
 
 ```php
 use Componenta\CQRS\ConfigKey;
@@ -219,7 +219,7 @@ Retry, lock and transport middleware use this provider. Their attributes need no
 
 A handler's message must occupy the first parameter slot. CQRS supplies that argument and delegates invocation to the configured `CallableInvokerInterface`. The default `CallableInvoker` does not inject missing arguments; a DI-aware custom invoker may supply additional dependencies. Attribute discovery itself does not perform argument injection.
 
-Terminal handlers pass the callable returned by the locator and the message to the configured invoker unchanged. Callable interpretation, visibility checks, and argument resolution belong to the invoker. In DI 5, exact string service IDs take precedence over callable syntax. When native target identity is required, a locator can provide an unambiguous callable, such as a first-class callable or a public static method array.
+Terminal handlers pass the callable returned by the locator and the message to the configured invoker unchanged. Callable interpretation, visibility checks, and argument resolution belong to the invoker. In DI 6, exact string service IDs take precedence over callable syntax. When native target identity is required, a locator can provide an unambiguous callable, such as a first-class callable or a public static method array.
 
 ## Optional packages
 
@@ -242,4 +242,4 @@ composer analyse
 composer bench
 ```
 
-CI targets PHP 8.4/8.5, runs the Pest suite and PHPStan at maximum level.
+CI runs Pest and PHPStan at maximum level on PHP 8.5. The package requires DI 6. Development CI can verify a pinned DI 6 source snapshot; release CI installs only the declared stable dependencies.
