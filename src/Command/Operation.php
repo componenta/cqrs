@@ -53,8 +53,9 @@ final readonly class Operation implements OperationInterface
         ?UuidInterface $id = null,
     ): self {
         if ($id === null) {
-            static $defaultUuidFactory = null;
-            $id = ($defaultUuidFactory ??= new UuidFactory())->generate();
+            /** @var UuidFactory $defaultUuidFactory */
+            static $defaultUuidFactory = new UuidFactory();
+            $id = $defaultUuidFactory->generate();
         }
 
         return new self(
