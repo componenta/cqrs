@@ -203,7 +203,7 @@ A middleware can return without reaching the terminal handler. A query result of
 $attribute = $metadata->get($command, MyAttribute::class);
 ```
 
-The default `ReflectionCommandMetadataProvider` reads the command class independently of handler registration and maps. Each call creates a fresh attribute, including object arguments. An absent attribute or command class returns `null`. Invalid attribute declarations, repeated metadata, or construction failures throw `InvalidCommandMetadataException`; construction failures retain their original cause.
+The default `ReflectionCommandMetadataProvider` reads the command class independently of handler registration and maps. Each call creates a fresh attribute, including object arguments. An absent attribute or command class returns `null`. The built-in provider uses a bounded cache of reflection descriptors for loaded classes; it never caches attribute instances or their constructor arguments. An unavailable class is checked again on subsequent lookups. Invalid attribute declarations, repeated metadata, or construction failures throw `InvalidCommandMetadataException`; construction failures retain their original cause.
 
 Retry, lock and transport middleware use this provider. Their attributes need no separate registration or compilation.
 
@@ -242,4 +242,4 @@ composer analyse
 composer bench
 ```
 
-CI runs Pest and PHPStan at maximum level on PHP 8.5. The package requires DI 6. Development CI can verify a pinned DI 6 source snapshot; release CI installs only the declared stable dependencies.
+CI runs Pest and PHPStan at maximum level on PHP 8.5 and an isolated production-consumer smoke test with minimum supported dependency versions on PHP 8.6. Development CI verifies a pinned DI 6 source snapshot; release CI installs the declared stable dependencies. The PHPBench suite separates construction, routing, attribute and metadata operations from real DI-backed dispatch.
