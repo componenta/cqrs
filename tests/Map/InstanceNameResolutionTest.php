@@ -7,6 +7,7 @@ use Componenta\CQRS\Command\NamedCommandInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\CQRS\Query\NamedQueryInterface;
+use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
 use Psr\Container\ContainerInterface;
 
 final readonly class InstanceNamedCommand implements NamedCommandInterface
@@ -91,27 +92,69 @@ it('resolves query names per instance instead of poisoning the class cache', fun
         ->and(($locator->locateFor($second))($second))->toBe('b');
 });
 
-it('uses the named-command fallback when a custom resolver does not support the instance', function (): void {
-    $map = [
-        'command.a' => ['service' => 'handler.a', 'method' => '__invoke'],
-    ];
-    $resolver = new class () implements CommandNameResolverInterface {
-        public function supports(object $command): bool
+it('uses default naming when the configured name resolver does not support the message', function (string $kind, bool $named): void {
+    $message = match (true) {
+        !$named => new stdClass(),
+        $kind === 'command' => new InstanceNamedCommand('command.a'),
+        default => new InstanceNamedQuery('query.a'),
+    };
+    $name = $named ? $kind . '.a' : $message::class;
+    $resolver = new class implements CommandNameResolverInterface, QueryNameResolverInterface {
+        public function supports(object $message): bool
         {
             return false;
         }
 
-        public function resolve(object $command): string
+        public function resolve(object $message): string
         {
             throw new RuntimeException('unsupported resolver was called');
         }
     };
-    $locator = new CommandHandlerLocator(
-        $map,
-        new InstanceNameContainer(['handler.a' => new InstanceNameHandler('a')]),
-        $resolver,
-    );
-    $command = new InstanceNamedCommand('command.a');
+    $map = [$name => ['service' => 'handler.a', 'method' => '__invoke']];
+    $container = new InstanceNameContainer(['handler.a' => new InstanceNameHandler('a')]);
+    $locator = $kind === 'command'
+        ? new CommandHandlerLocator($map, $container, $resolver)
+        : new QueryHandlerLocator($map, $container, $resolver);
 
-    expect(($locator->locateFor($command))($command))->toBe('a');
-});
+    expect($locator->supports($message))->toBeTrue()
+        ->and(($locator->locateFor($message))($message))->toBe('a');
+})->with([
+    'named command' => ['command', true],
+    'ordinary command' => ['command', false],
+    'named query' => ['query', true],
+    'ordinary query' => ['query', false],
+]);
+
+it('does not fall back to default naming when a supporting resolver fails', function (string $kind): void {
+    $failure = new RuntimeException('name resolution failed');
+    $resolver = new readonly class ($failure) implements CommandNameResolverInterface, QueryNameResolverInterface {
+        public function __construct(private Throwable $failure) {}
+
+        public function supports(object $message): bool
+        {
+            return true;
+        }
+
+        public function resolve(object $message): string
+        {
+            throw $this->failure;
+        }
+    };
+    $map = [stdClass::class => ['service' => 'handler.a', 'method' => '__invoke']];
+    $container = new InstanceNameContainer(['handler.a' => new InstanceNameHandler('a')]);
+    $locator = $kind === 'command'
+        ? new CommandHandlerLocator($map, $container, $resolver)
+        : new QueryHandlerLocator($map, $container, $resolver);
+
+    foreach (['supports', 'locateFor'] as $method) {
+        try {
+            $locator->$method(new stdClass());
+        } catch (Throwable $exception) {
+            expect($exception)->toBe($failure);
+
+            continue;
+        }
+
+        test()->fail('Expected the name resolution failure from ' . $method . '().');
+    }
+})->with(['command', 'query']);

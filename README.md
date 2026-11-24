@@ -176,7 +176,7 @@ The default array locators use an injected name resolver only when it supports t
 
 ## Failure contracts
 
-When terminal handler lookup is reached, the command and query buses expose the following failures without wrapping them:
+The command and query buses propagate failures from the relevant processing stage without wrapping them. Handler lookup failures apply only if processing reaches the terminal handler:
 
 | Situation | Exception |
 | --- | --- |
