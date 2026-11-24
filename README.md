@@ -163,6 +163,38 @@ Names are resolved for each message instance. `supports()` does not instantiate 
 
 [componenta/cqrs-app](https://github.com/componenta/cqrs-app) adds attribute discovery and `app:build`. A current file avoids discovery; a missing or invalid file falls back to source. Both paths use these same locators and registration rules.
 
+## Name resolution and support
+
+Command and query name resolvers implement the corresponding name-resolver interface. Their contracts are independent of handler registration:
+
+- `supports(message)`: true when the resolver can determine the message name; false is a normal capability-check result. It does not establish that a handler is registered.
+- `resolve(message)`: returns the name used for lookup, or throws the respective `UnsupportedCommandException` / `UnsupportedQueryException` for an unsupported message. Other resolution failures propagate unchanged.
+
+The default resolvers support every object, using its explicit `NamedCommandInterface` / `NamedQueryInterface` name if provided, otherwise its PHP class name. Composite resolvers choose the first supporting delegate in configuration order, then the supporting fallback. If none supports the message, `supports()` returns false and `resolve()` throws the corresponding unsupported-message exception. A failure in a selected resolver does not trigger fallback.
+
+The default array locators use an injected name resolver only when it supports the message. Otherwise they use the default naming rules. A locator's own `supports()` checks whether it owns the message (whether a matching registration exists in an array locator), without constructing or executing a handler. True does not guarantee successful service resolution. A composite locator delegates to its first supporting locator or its configured fallback and propagates failure from that selection.
+
+## Failure contracts
+
+When terminal handler lookup is reached, the command and query buses expose the following failures without wrapping them:
+
+| Situation | Exception |
+| --- | --- |
+| No matching command registration | `Command\Exception\HandlerNotFoundException` |
+| No matching query registration | `Query\Exception\HandlerNotFoundException` |
+| Mapped command service does not satisfy the callable descriptor | `Command\Exception\InvalidHandlerException` |
+| Mapped query service does not satisfy the callable descriptor | `Query\Exception\InvalidHandlerException` |
+| Invalid operation attributes or array query context | `InvalidArgumentException` |
+| Mapped service missing from the container or failing to initialize | Original PSR-11 container exception |
+| Callable preparation or argument resolution fails | Original invoker exception (`Componenta\DI\Exception\ExceptionInterface` for DI-owned failures) |
+| Handler or middleware throws | Original escaping throwable |
+
+CQRS exception names in this table are relative to `Componenta\CQRS`. `HandlerNotFoundException` carries the resolved logical message name; an absent DI service for an existing registration is a container failure, not a missing-handler registration.
+
+A middleware can return without reaching the terminal handler. A query result of null is valid, and a command operation may have no result when processing is deferred. A completed synchronous command returning null has an `OperationResult` whose value is null. Neither bus converts a failure into a null result.
+
+`EventMiddleware` may explicitly suppress listener-body errors when configured to do so. If notifying listeners of a downstream failure also fails, `CommandFailureNotificationException` preserves both exceptions. The bus itself does not catch or translate exceptions. Malformed registrations and invalid middleware configuration are rejected during map or pipeline construction, not reported as missing handler registrations.
+
 ## Metadata
 
 `CommandMetadataProviderInterface` exposes one operation:
