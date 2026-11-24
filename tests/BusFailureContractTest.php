@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Componenta\CQRS\Command\CommandBus;
+use Componenta\CQRS\Exception\ExceptionInterface as CqrsExceptionInterface;
 use Componenta\CQRS\Command\Exception\HandlerNotFoundException as CommandHandlerNotFoundException;
 use Componenta\CQRS\Command\Exception\InvalidHandlerException as InvalidCommandHandlerException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
@@ -106,7 +107,8 @@ it('propagates the original exception when resolving a registered service fails'
             $container,
         );
     } catch (Throwable $exception) {
-        expect($exception)->toBe($failure);
+        expect($exception)->toBe($failure)
+            ->and($exception)->not->toBeInstanceOf(CqrsExceptionInterface::class);
 
         return;
     }
@@ -144,6 +146,7 @@ it('propagates an invoker preparation failure without wrapping it or executing t
         );
     } catch (Throwable $exception) {
         expect($exception)->toBe($failure)
+            ->and($exception)->not->toBeInstanceOf(CqrsExceptionInterface::class)
             ->and($calls->getArrayCopy())->toBe([]);
 
         return;
@@ -165,7 +168,8 @@ it('propagates the original domain exception from the executed handler', functio
             ]),
         );
     } catch (Throwable $exception) {
-        expect($exception)->toBe($failure);
+        expect($exception)->toBe($failure)
+            ->and($exception)->not->toBeInstanceOf(CqrsExceptionInterface::class);
 
         return;
     }

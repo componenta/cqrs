@@ -12,7 +12,7 @@ use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class CommandBusFactory
@@ -22,7 +22,7 @@ final class CommandBusFactory
         $config = $container->get(Config::class);
 
         if (!$config instanceof Config) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must be a %s instance.',
                 Config::class,
                 Config::class,
@@ -32,7 +32,7 @@ final class CommandBusFactory
         $handler = $container->get(HandleCommandHandler::class);
 
         if (!$handler instanceof OperationHandlerInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 HandleCommandHandler::class,
                 OperationHandlerInterface::class,
@@ -42,7 +42,7 @@ final class CommandBusFactory
         $middlewareIds = $config->get(ConfigKey::COMMAND_MIDDLEWARES, []);
 
         if (!is_array($middlewareIds) || !array_is_list($middlewareIds)) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Configuration entry "%s" must be a list of middleware service ids.',
                 ConfigKey::COMMAND_MIDDLEWARES,
             ));
@@ -52,7 +52,7 @@ final class CommandBusFactory
 
         foreach ($middlewareIds as $index => $middlewareId) {
             if (!is_string($middlewareId) || trim($middlewareId) === '') {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Command middleware service id at index %d must be a non-empty string.',
                     $index,
                 ));
@@ -61,7 +61,7 @@ final class CommandBusFactory
             $middleware = $container->get($middlewareId);
 
             if (!$middleware instanceof MiddlewareInterface) {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Command middleware service "%s" must implement %s; got %s.',
                     $middlewareId,
                     MiddlewareInterface::class,
@@ -77,7 +77,7 @@ final class CommandBusFactory
             : new OperationFactory();
 
         if (!$operationFactory instanceof OperationFactoryInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 OperationFactoryInterface::class,
                 OperationFactoryInterface::class,

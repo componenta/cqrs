@@ -8,7 +8,7 @@ use Componenta\CQRS\Command\Locator\CommandHandlerLocator;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Componenta\CQRS\ConfigKey;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class CommandHandlerLocatorFactory
@@ -18,7 +18,7 @@ final class CommandHandlerLocatorFactory
         $maps = $container->get(ConfigKey::MAPS);
 
         if (!is_array($maps) || !is_array($maps['command_handlers'] ?? null)) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must contain array "command_handlers".',
                 ConfigKey::MAPS,
             ));
@@ -30,7 +30,7 @@ final class CommandHandlerLocatorFactory
             $resolver = $container->get(CommandNameResolverInterface::class);
 
             if (!$resolver instanceof CommandNameResolverInterface) {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Container entry "%s" must implement %s.',
                     CommandNameResolverInterface::class,
                     CommandNameResolverInterface::class,

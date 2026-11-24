@@ -8,7 +8,7 @@ use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class HandleQueryFactory
@@ -18,7 +18,7 @@ final class HandleQueryFactory
         $locator = $container->get(QueryHandlerLocatorInterface::class);
 
         if (!$locator instanceof QueryHandlerLocatorInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 QueryHandlerLocatorInterface::class,
                 QueryHandlerLocatorInterface::class,
@@ -30,7 +30,7 @@ final class HandleQueryFactory
             : new CallableInvoker();
 
         if (!$invoker instanceof CallableInvokerInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 CallableInvokerInterface::class,
                 CallableInvokerInterface::class,

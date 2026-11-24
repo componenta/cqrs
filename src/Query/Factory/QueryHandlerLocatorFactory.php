@@ -8,7 +8,7 @@ use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocator;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
 use Componenta\CQRS\Query\Resolver\QueryNameResolverInterface;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class QueryHandlerLocatorFactory
@@ -18,7 +18,7 @@ final class QueryHandlerLocatorFactory
         $maps = $container->get(ConfigKey::MAPS);
 
         if (!is_array($maps) || !is_array($maps['query_handlers'] ?? null)) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must contain array "query_handlers".',
                 ConfigKey::MAPS,
             ));
@@ -30,7 +30,7 @@ final class QueryHandlerLocatorFactory
             $resolver = $container->get(QueryNameResolverInterface::class);
 
             if (!$resolver instanceof QueryNameResolverInterface) {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Container entry "%s" must implement %s.',
                     QueryNameResolverInterface::class,
                     QueryNameResolverInterface::class,

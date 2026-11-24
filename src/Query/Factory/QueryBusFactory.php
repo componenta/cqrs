@@ -9,7 +9,7 @@ use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Query\HandleQuery;
 use Componenta\CQRS\Query\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Query\QueryBus;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class QueryBusFactory
@@ -19,7 +19,7 @@ final class QueryBusFactory
         $config = $container->get(Config::class);
 
         if (!$config instanceof Config) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must be a %s instance.',
                 Config::class,
                 Config::class,
@@ -29,7 +29,7 @@ final class QueryBusFactory
         $handler = $container->get(HandleQuery::class);
 
         if (!$handler instanceof HandleQuery) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must be a %s instance.',
                 HandleQuery::class,
                 HandleQuery::class,
@@ -39,7 +39,7 @@ final class QueryBusFactory
         $middlewareIds = $config->get(ConfigKey::QUERY_MIDDLEWARES, []);
 
         if (!is_array($middlewareIds) || !array_is_list($middlewareIds)) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Configuration entry "%s" must be a list of middleware service ids.',
                 ConfigKey::QUERY_MIDDLEWARES,
             ));
@@ -49,7 +49,7 @@ final class QueryBusFactory
 
         foreach ($middlewareIds as $index => $middlewareId) {
             if (!is_string($middlewareId) || trim($middlewareId) === '') {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Query middleware service id at index %d must be a non-empty string.',
                     $index,
                 ));
@@ -58,7 +58,7 @@ final class QueryBusFactory
             $middleware = $container->get($middlewareId);
 
             if (!$middleware instanceof MiddlewareInterface) {
-                throw new LogicException(sprintf(
+                throw new InvalidConfigurationException(sprintf(
                     'Query middleware service "%s" must implement %s; got %s.',
                     $middlewareId,
                     MiddlewareInterface::class,

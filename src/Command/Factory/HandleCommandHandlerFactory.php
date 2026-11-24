@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command\Factory;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\DI\CallableInvokerInterface;
-use LogicException;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
 use Psr\Container\ContainerInterface;
 
 final class HandleCommandHandlerFactory
@@ -17,7 +17,7 @@ final class HandleCommandHandlerFactory
         $locator = $container->get(CommandHandlerLocatorInterface::class);
 
         if (!$locator instanceof CommandHandlerLocatorInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 CommandHandlerLocatorInterface::class,
                 CommandHandlerLocatorInterface::class,
@@ -27,7 +27,7 @@ final class HandleCommandHandlerFactory
         $invoker = $container->get(CallableInvokerInterface::class);
 
         if (!$invoker instanceof CallableInvokerInterface) {
-            throw new LogicException(sprintf(
+            throw new InvalidConfigurationException(sprintf(
                 'Container entry "%s" must implement %s.',
                 CallableInvokerInterface::class,
                 CallableInvokerInterface::class,
