@@ -23,8 +23,8 @@ final readonly class PipelineHandler implements OperationHandlerInterface
      */
     public static function compile(OperationHandlerInterface $handler, array $middlewares): OperationHandlerInterface
     {
-        for ($i = \count($middlewares) - 1; $i >= 0; --$i) {
-            $handler = new self($middlewares[$i], $handler);
+        foreach (array_reverse($middlewares) as $middleware) {
+            $handler = new self($middleware, $handler);
         }
 
         return $handler;
