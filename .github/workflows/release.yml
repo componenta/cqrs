@@ -39,7 +39,10 @@ jobs:
           composer require 'componenta/di:^6.0@dev' --no-update --no-interaction
       - run: composer install --no-interaction --prefer-dist
       - run: composer show componenta/di
-      - run: composer audit --locked --no-interaction
+      # Dev tooling (PHPBench) still pulls abandoned doctrine/annotations.
+      # Keep advisory/malware checks strict and report dev maintenance warnings.
+      - run: composer audit --locked --abandoned=report --no-interaction
+      - run: composer audit --locked --no-dev --abandoned=fail --no-interaction
       - run: composer test
       - run: composer analyse
       - name: Measure comparable baseline and candidate
