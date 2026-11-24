@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
  * Command bus decorator that can dispatch multiple commands in sequence.

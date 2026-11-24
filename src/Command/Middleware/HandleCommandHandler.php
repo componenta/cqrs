@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Middleware;
 
+use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
@@ -21,7 +22,7 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
     /**
      * Locates and invokes the command handler, then records its result.
      *
-     * @throws \RuntimeException If the operation already has a result.
+     * @throws OperationAlreadyCompletedException If the operation already has a result.
      * @throws \Componenta\CQRS\Command\Exception\HandlerNotFoundException
      * @throws \Componenta\CQRS\Command\Exception\InvalidHandlerException
      * @throws \Throwable Other failures from lookup, invocation or result creation.
@@ -29,7 +30,7 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
     public function handle(OperationInterface $operation): OperationInterface
     {
         if ($operation->result !== null) {
-            throw new \RuntimeException('Operation already has result');
+            throw new OperationAlreadyCompletedException('Operation already has result');
         }
 
         $handler = $this->locator->locateFor($operation->command);

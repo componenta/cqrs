@@ -8,7 +8,7 @@ use Attribute;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 #[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
 final readonly class AsCommandListener

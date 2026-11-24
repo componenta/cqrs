@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Exception;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use LogicException;
 
 /** Thrown when a mapped query handler service cannot satisfy its descriptor. */
-final class InvalidHandlerException extends LogicException
+final class InvalidHandlerException extends LogicException implements ExceptionInterface
 {
     public static function serviceNotInvokable(string $service, string $query): self
     {

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Exception;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Query\NamedQueryInterface;
 use RuntimeException;
 
-class HandlerNotFoundException extends RuntimeException
+class HandlerNotFoundException extends RuntimeException implements ExceptionInterface
 {
     public readonly string $queryName;
 

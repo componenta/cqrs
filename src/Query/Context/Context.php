@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Context;
 
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
  * Default immutable {@see ContextInterface} - stores attributes in an array.

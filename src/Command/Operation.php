@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use DateTimeImmutable;
 use DateTimeZone;
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 
@@ -56,7 +57,7 @@ final readonly class Operation implements OperationInterface
     public function withResult(OperationResult $result): OperationInterface
     {
         if ($this->result !== null) {
-            throw new \RuntimeException('Operation already has result');
+            throw new OperationAlreadyCompletedException('Operation already has result');
         }
 
         return clone($this, ['result' => $result]);

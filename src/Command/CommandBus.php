@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\Middleware\PipelineHandler;
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /** Command bus implementation with middleware pipeline support. */
 final readonly class CommandBus implements CommandBusInterface

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Exception;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use RuntimeException;
 use Throwable;
 
-final class CommandFailureNotificationException extends RuntimeException
+final class CommandFailureNotificationException extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly Throwable $commandFailure,
