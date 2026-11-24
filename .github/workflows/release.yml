@@ -53,7 +53,7 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           # A benchmark-base trailer can select an older, compatible source revision.
-          override="$(printf '%s\\n' "$COMMIT_MESSAGE" | sed -nE 's/^Benchmark-base: ([0-9a-f]{40})$/\\1/p')"
+          override="$(printf '%s\n' "$COMMIT_MESSAGE" | sed -nE 's/^Benchmark-base: ([0-9a-f]{40})$/\1/p')"
           if [ -n "$override" ]; then BASE_SHA="$override"; fi
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"

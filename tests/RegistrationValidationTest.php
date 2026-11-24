@@ -83,3 +83,34 @@ it('produces deterministic message ordering independently of provider registrati
     expect(array_keys($maps['command_handlers']))->toBe(['a', 'z']);
     expect(array_keys($maps['command_listeners']))->toBe(['a', 'z']);
 });
+
+
+it('rejects duplicate listeners after canonicalizing event order and repetitions', function (): void {
+    $container = new ContainerValue(new FakeContainer([]), new Config([
+        'cqrs.command_listeners' => [
+            ['message' => 'cmd', 'service' => 'listener', 'priority' => 7,
+                'events' => [CommandProcessEvent::class, CommandFailedEvent::class]],
+            ['message' => 'cmd', 'service' => 'listener', 'priority' => 7,
+                'events' => [CommandFailedEvent::class, CommandProcessEvent::class, CommandFailedEvent::class]],
+        ],
+    ], new Environment([])));
+
+    expect(fn () => (new CqrsMapsFactory())($container))
+        ->toThrow(InvalidCqrsMapException::class, 'repeats an identical listener registration');
+});
+
+it('keeps distinct descriptors for one service in canonical priority and event order', function (): void {
+    $container = new ContainerValue(new FakeContainer([]), new Config([
+        'cqrs.command_listeners' => [
+            ['message' => 'cmd', 'service' => 'listener', 'priority' => 1, 'events' => [CommandProcessEvent::class]],
+            ['message' => 'cmd', 'service' => 'listener', 'priority' => 2, 'events' => [CommandProcessEvent::class]],
+            ['message' => 'cmd', 'service' => 'listener', 'priority' => 2, 'events' => [CommandFailedEvent::class]],
+        ],
+    ], new Environment([])));
+
+    expect((new CqrsMapsFactory())($container)['command_listeners']['cmd'])->toBe([
+        ['service' => 'listener', 'events' => [CommandFailedEvent::class], 'priority' => 2],
+        ['service' => 'listener', 'events' => [CommandProcessEvent::class], 'priority' => 2],
+        ['service' => 'listener', 'events' => [CommandProcessEvent::class], 'priority' => 1],
+    ]);
+});

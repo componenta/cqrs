@@ -56,7 +56,17 @@ final class RegistrationNormalizer
                 }
             }
         }
-        return self::maps($maps);
+        // Every descriptor above has already been validated and normalized.
+        // Only canonical ordering remains; maps() is the external-map boundary.
+        ksort($maps['command_handlers'], SORT_STRING);
+        ksort($maps['query_handlers'], SORT_STRING);
+        foreach ($maps['command_listeners'] as $message => $group) {
+            self::sortListeners($group);
+            $maps['command_listeners'][$message] = $group;
+        }
+        ksort($maps['command_listeners'], SORT_STRING);
+
+        return $maps;
     }
 
     /** @return Maps */
@@ -104,10 +114,7 @@ final class RegistrationNormalizer
                 }
                 $normalized[] = $listener;
             }
-            usort($normalized, static fn (array $a, array $b): int =>
-                ($b['priority'] <=> $a['priority'])
-                ?: strcmp($a['service'], $b['service'])
-                ?: strcmp(implode("\0", $a['events']), implode("\0", $b['events'])));
+            self::sortListeners($normalized);
             $result[$message] = $normalized;
         }
         ksort($result, SORT_STRING);
@@ -134,6 +141,15 @@ final class RegistrationNormalizer
             }
         }
         return self::maps($source);
+    }
+
+    /** @param list<Listener> $listeners */
+    private static function sortListeners(array &$listeners): void
+    {
+        usort($listeners, static fn (array $a, array $b): int =>
+            ($b['priority'] <=> $a['priority'])
+            ?: strcmp($a['service'], $b['service'])
+            ?: strcmp(implode("\0", $a['events']), implode("\0", $b['events'])));
     }
 
     /** @return Handler */
