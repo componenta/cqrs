@@ -144,3 +144,15 @@ it('rejects an invalid query callable invoker dependency', function (): void {
     expect(fn () => (new HandleQueryFactory())($container))
         ->toThrow(LogicException::class, CallableInvokerInterface::class);
 });
+
+it('rejects invalid registered optional clock or UUID factory rather than silently falling back', function (string $id, mixed $invalid): void {
+    $container = new FakeContainer([$id => $invalid]);
+
+    expect(fn () => (new \Componenta\CQRS\Command\Factory\OperationFactoryFactory())($container))
+        ->toThrow(\Componenta\CQRS\Exception\InvalidConfigurationException::class, $id);
+})->with([
+    [\Psr\Clock\ClockInterface::class, null],
+    [\Psr\Clock\ClockInterface::class, new stdClass()],
+    [\Componenta\Identity\UuidFactoryInterface::class, null],
+    [\Componenta\Identity\UuidFactoryInterface::class, new stdClass()],
+]);

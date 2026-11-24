@@ -16,6 +16,9 @@ use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\ConfigProvider;
 use Componenta\CQRS\Query\QueryBusInterface;
 use Componenta\DI\ContainerFactory;
+use Componenta\Identity\RfcUuidInterface;
+use Componenta\Identity\Uuid;
+use Psr\Clock\ClockInterface;
 
 require $argv[1] ?? throw new InvalidArgumentException('Consumer autoloader path required.');
 
@@ -55,8 +58,11 @@ final class ConsumerListener implements CommandListenerInterface
 }
 
 $listener = new ConsumerListener();
-$provider = new class ($listener) extends BaseProvider {
-    public function __construct(private readonly ConsumerListener $listener) {}
+$clock = new class implements ClockInterface {
+    public function now(): DateTimeImmutable { return new DateTimeImmutable('2025-02-03T10:00:00.123456+09:00'); }
+};
+$provider = new class ($listener, $clock) extends BaseProvider {
+    public function __construct(private readonly ConsumerListener $listener, private readonly ClockInterface $clock) {}
 
     protected function getConfig(): array
     {
@@ -80,6 +86,7 @@ $provider = new class ($listener) extends BaseProvider {
             ConsumerHandler::class => new ConsumerHandler(),
             ConsumerDependency::class => new ConsumerDependency(1),
             ConsumerListener::class => $this->listener,
+            ClockInterface::class => $this->clock,
         ];
     }
 };
@@ -94,7 +101,12 @@ $value = 'original';
 $operation = $commands->dispatch($message, ['trace' => &$value]);
 $value = 'changed';
 
-if ($operation->result?->value !== 42
+if (!$operation->id instanceof Uuid
+    || !$operation->id instanceof RfcUuidInterface
+    || $operation->id->version !== 7
+    || $operation->createdAt->format('Y-m-d H:i:s.uP') !== '2025-02-03 10:00:00.123456+09:00'
+    || $operation->result?->processedAt->format('Y-m-d H:i:s.uP') !== '2025-02-03 10:00:00.123456+09:00'
+    || $operation->result?->value !== 42
     || $operation->command !== $message
     || $operation->attributes !== ['trace' => 'original']
     || $queries->handle($message) !== 42

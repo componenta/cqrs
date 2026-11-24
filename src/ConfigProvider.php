@@ -21,7 +21,7 @@ use Componenta\CQRS\Query\QueryBusInterface;
 
 class ConfigProvider extends \Componenta\Config\ConfigProvider
 {
-    protected function getInvokables(): array
+    protected function getAliases(): array
     {
         return [
             OperationFactoryInterface::class => OperationFactory::class,
@@ -31,6 +31,7 @@ class ConfigProvider extends \Componenta\Config\ConfigProvider
     protected function getFactories(): array
     {
         return [
+            OperationFactory::class => Command\Factory\OperationFactoryFactory::class,
             ConfigKey::MAPS => Factory\CqrsMapsFactory::class,
             QueryBusInterface::class => QueryBusFactory::class,
             QueryHandlerLocatorInterface::class => QueryHandlerLocatorFactory::class,

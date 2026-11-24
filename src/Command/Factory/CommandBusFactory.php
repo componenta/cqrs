@@ -9,7 +9,6 @@ use Componenta\CQRS\Command\CommandBus;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
-use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Exception\InvalidConfigurationException;
@@ -74,7 +73,7 @@ final class CommandBusFactory
 
         $operationFactory = $container->has(OperationFactoryInterface::class)
             ? $container->get(OperationFactoryInterface::class)
-            : new OperationFactory();
+            : (new OperationFactoryFactory())($container);
 
         if (!$operationFactory instanceof OperationFactoryInterface) {
             throw new InvalidConfigurationException(sprintf(

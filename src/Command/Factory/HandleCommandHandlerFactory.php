@@ -8,6 +8,7 @@ use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\DI\CallableInvokerInterface;
 use Componenta\CQRS\Exception\InvalidConfigurationException;
+use Psr\Clock\ClockInterface;
 use Psr\Container\ContainerInterface;
 
 final class HandleCommandHandlerFactory
@@ -34,6 +35,18 @@ final class HandleCommandHandlerFactory
             ));
         }
 
-        return new HandleCommandHandler($locator, $invoker);
+        $clock = null;
+        if ($container->has(ClockInterface::class)) {
+            $clock = $container->get(ClockInterface::class);
+            if (!$clock instanceof ClockInterface) {
+                throw new InvalidConfigurationException(sprintf(
+                    'Container entry "%s" must implement %s.',
+                    ClockInterface::class,
+                    ClockInterface::class,
+                ));
+            }
+        }
+
+        return new HandleCommandHandler($locator, $invoker, $clock);
     }
 }
