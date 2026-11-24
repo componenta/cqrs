@@ -13,15 +13,11 @@ use Componenta\CQRS\Command\Resolver\CommandNameResolverInterface;
 use Psr\Container\ContainerInterface;
 use Componenta\CQRS\Internal\RegistrationNormalizer;
 
-/**
- * @phpstan-import-type Handler from RegistrationNormalizer
- * @phpstan-import-type Listener from RegistrationNormalizer
- */
 final class CommandListenersLocator implements CommandListenersLocatorInterface
 {
     use CommandNameResolution;
 
-    /** @var array<array-key, list<Listener>> */
+    /** @var array<array-key, array<string, list<string>>> */
     private readonly array $listeners;
 
     /** @param array<array-key, mixed> $listeners */
@@ -30,7 +26,18 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
         private readonly ContainerInterface $container,
         ?CommandNameResolverInterface $resolver = null,
     ) {
-        $this->listeners = RegistrationNormalizer::listeners($listeners);
+        $byEvent = [];
+        foreach (RegistrationNormalizer::listeners($listeners) as $message => $descriptors) {
+            foreach ($descriptors as $descriptor) {
+                $events = $descriptor['events'] === []
+                    ? [CommandProcessEvent::class, CommandProcessedEvent::class, CommandFailedEvent::class]
+                    : $descriptor['events'];
+                foreach ($events as $event) {
+                    $byEvent[$message][$event][] = $descriptor['service'];
+                }
+            }
+        }
+        $this->listeners = $byEvent;
         $this->resolver = $resolver;
     }
 
@@ -38,20 +45,12 @@ final class CommandListenersLocator implements CommandListenersLocatorInterface
         CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event,
     ): iterable {
         $commandName = $this->resolveCommandName($event->operation->command);
-        $eventType = $event::class;
-
-        foreach (($this->listeners[$commandName] ?? []) as $descriptor) {
-            if ($descriptor['events'] !== []
-                && !in_array($eventType, $descriptor['events'], true)
-            ) {
-                continue;
-            }
-
-            $listener = $this->container->get($descriptor['service']);
+        foreach ($this->listeners[$commandName][$event::class] ?? [] as $service) {
+            $listener = $this->container->get($service);
 
             if (!$listener instanceof CommandListenerInterface) {
                 throw InvalidListenerException::serviceType(
-                    $descriptor['service'],
+                    $service,
                     get_debug_type($listener),
                 );
             }
