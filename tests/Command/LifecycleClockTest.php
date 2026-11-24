@@ -198,3 +198,113 @@ it('does not read time again after successful stop and leaves state unchanged on
         ->and($event->isPropagationStopped)->toBeTrue()
         ->and($event->propagationStoppedAt)->toBe($time);
 });
+
+it('preserves the first successful stop when a user clock suspends in a fiber', function (): void {
+    $firstReading = new DateTimeImmutable('2025-02-03T10:00:01Z');
+    $secondReading = new DateTimeImmutable('2025-02-03T10:00:02Z');
+    $clock = new class ($firstReading, $secondReading) implements ClockInterface {
+        public int $calls = 0;
+
+        public function __construct(
+            private readonly DateTimeImmutable $firstReading,
+            private readonly DateTimeImmutable $secondReading,
+        ) {}
+
+        public function now(): DateTimeImmutable
+        {
+            return match (++$this->calls) {
+                1 => new DateTimeImmutable('2025-02-03T10:00:00Z'),
+                2 => $this->suspend(),
+                3 => $this->secondReading,
+                default => throw new LogicException('Unexpected clock read.'),
+            };
+        }
+
+        private function suspend(): DateTimeImmutable
+        {
+            Fiber::suspend();
+            return $this->firstReading;
+        }
+    };
+
+    $event = new CommandProcessEvent(Operation::create(new stdClass()), $clock);
+    $fiber = new Fiber(static fn () => $event->stop());
+    $fiber->start();
+    expect($fiber->isSuspended())->toBeTrue()
+        ->and($event->isPropagationStopped)->toBeFalse();
+
+    $event->stop();
+    expect($event->propagationStoppedAt)->toBe($secondReading);
+
+    $fiber->resume();
+    $event->stop();
+
+    expect($fiber->isTerminated())->toBeTrue()
+        ->and($event->isPropagationStopped)->toBeTrue()
+        ->and($event->propagationStoppedAt)->toBe($secondReading)
+        ->and($clock->calls)->toBe(3);
+});
+
+it('preserves a completion clock failure after invoking the handler and emits only failed notification', function (): void {
+    $failure = new RuntimeException('completion clock failed');
+    $processTime = new DateTimeImmutable('2025-02-03T10:00:00Z');
+    $failedTime = new DateTimeImmutable('2025-02-03T10:00:02Z');
+    $clock = new LifecycleSequenceClock([$processTime, $failure, $failedTime]);
+    $events = [];
+    $calls = 0;
+    $middleware = lifecycleClockMiddleware(static function ($event) use (&$events): void {
+        $events[] = $event;
+    }, $clock, true);
+    $handler = lifecycleClockHandler(static function () use (&$calls): string {
+        ++$calls;
+        return 'side effect completed';
+    }, $clock);
+    $operation = Operation::create(new stdClass());
+
+    try {
+        $middleware->execute($operation, $handler);
+        test()->fail('Expected the completion clock error.');
+    } catch (RuntimeException $caught) {
+        expect($caught)->toBe($failure);
+    }
+
+    expect($calls)->toBe(1)
+        ->and($clock->calls)->toBe(3)
+        ->and($operation->result)->toBeNull()
+        ->and($events)->toHaveCount(2)
+        ->and($events[0])->toBeInstanceOf(CommandProcessEvent::class)
+        ->and($events[0]->dispatchedAt)->toBe($processTime)
+        ->and($events[1])->toBeInstanceOf(CommandFailedEvent::class)
+        ->and($events[1]->operation)->toBe($operation)
+        ->and($events[1]->exception)->toBe($failure)
+        ->and($events[1]->dispatchedAt)->toBe($failedTime);
+});
+
+it('does not convert a processed event clock failure into a failed event or suppress it', function (): void {
+    $failure = new RuntimeException('processed event clock failed');
+    $processTime = new DateTimeImmutable('2025-02-03T10:00:00Z');
+    $completionTime = new DateTimeImmutable('2025-02-03T10:00:01Z');
+    $clock = new LifecycleSequenceClock([$processTime, $completionTime, $failure]);
+    $events = [];
+    $calls = 0;
+    $middleware = lifecycleClockMiddleware(static function ($event) use (&$events): void {
+        $events[] = $event;
+    }, $clock, true);
+    $handler = lifecycleClockHandler(static function () use (&$calls): string {
+        ++$calls;
+        return 'done';
+    }, $clock);
+
+    try {
+        $middleware->execute(Operation::create(new stdClass()), $handler);
+        test()->fail('Expected the processed event clock error.');
+    } catch (RuntimeException $caught) {
+        expect($caught)->toBe($failure);
+    }
+
+    expect($calls)->toBe(1)
+        ->and($clock->calls)->toBe(3)
+        ->and($events)->toHaveCount(1)
+        ->and($events[0])->toBeInstanceOf(CommandProcessEvent::class)
+        ->and($events[0]->dispatchedAt)->toBe($processTime);
+});

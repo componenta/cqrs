@@ -66,8 +66,9 @@ class CommandEvent
     public function stop(): void
     {
         if ($this->propagationStoppedAt === null) {
-            $this->propagationStoppedAt = $this->clock->now();
+            $stoppedAt = $this->clock->now();
+            // A user clock may suspend or re-enter stop(). Preserve the first successful stop.
+            $this->propagationStoppedAt ??= $stoppedAt;
         }
     }
-
 }
