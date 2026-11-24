@@ -91,3 +91,104 @@ it('returns null for an unavailable command class', function (): void {
     expect((new ReflectionCommandMetadataProvider())->get('MissingCommandForMetadataLookup', MetadataWithObject::class))
         ->toBeNull();
 });
+
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class LateAvailableMetadataTarget
+{
+}
+
+#[CqrsLateAvailableMetadataAlias]
+final class LateAvailableMetadataCommand
+{
+}
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class RetriedMetadata
+{
+    public static bool $fail = true;
+
+    public function __construct()
+    {
+        if (self::$fail) {
+            throw new DomainException('temporary metadata failure');
+        }
+    }
+}
+
+#[RetriedMetadata]
+final class RetriedMetadataCommand
+{
+}
+
+it('does not treat an unavailable command class as permanently absent', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+    $alias = 'CqrsMetadataCommandLateAlias';
+    expect($provider->get($alias, MetadataWithObject::class))->toBeNull();
+
+    class_alias(MetadataCommand::class, $alias);
+
+    expect($provider->get($alias, MetadataWithObject::class))->toBeInstanceOf(MetadataWithObject::class);
+});
+
+it('rechecks an attribute class that was not yet available', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+
+    expect(fn () => $provider->get(LateAvailableMetadataCommand::class, 'CqrsLateAvailableMetadataAlias'))
+        ->toThrow(InvalidCommandMetadataException::class, 'does not exist');
+
+    class_alias(LateAvailableMetadataTarget::class, 'CqrsLateAvailableMetadataAlias');
+
+    expect($provider->get(LateAvailableMetadataCommand::class, 'CqrsLateAvailableMetadataAlias'))
+        ->toBeInstanceOf(LateAvailableMetadataTarget::class);
+});
+
+it('retries metadata construction after a previous constructor failure', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+    RetriedMetadata::$fail = true;
+
+    try {
+        expect(fn () => $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class))
+            ->toThrow(InvalidCommandMetadataException::class, 'temporary metadata failure');
+
+        RetriedMetadata::$fail = false;
+        $first = $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class);
+        $second = $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class);
+
+        expect($first)->toBeInstanceOf(RetriedMetadata::class)
+            ->and($second)->toBeInstanceOf(RetriedMetadata::class)
+            ->and($second)->not->toBe($first);
+    } finally {
+        RetriedMetadata::$fail = true;
+    }
+});
+
+it('keeps constructor failures observable even after successful metadata lookup', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+    RetriedMetadata::$fail = false;
+
+    try {
+        expect($provider->get(RetriedMetadataCommand::class, RetriedMetadata::class))
+            ->toBeInstanceOf(RetriedMetadata::class);
+
+        RetriedMetadata::$fail = true;
+        expect(fn () => $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class))
+            ->toThrow(InvalidCommandMetadataException::class, 'temporary metadata failure');
+    } finally {
+        RetriedMetadata::$fail = true;
+    }
+});
+
+it('preserves exact attribute-name matching across repeated lookups', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+    $alias = 'CqrsMetadataExactNameAlias';
+    class_alias(MetadataWithObject::class, $alias);
+
+    expect($provider->get(MetadataCommand::class, MetadataWithObject::class))
+        ->toBeInstanceOf(MetadataWithObject::class)
+        ->and($provider->get(MetadataCommand::class, $alias))->toBeNull()
+        ->and($provider->get(MetadataCommand::class, strtolower(MetadataWithObject::class)))
+        ->toBeInstanceOf(MetadataWithObject::class)
+        ->and($provider->get(MetadataCommand::class, '\\' . MetadataWithObject::class))
+        ->toBeInstanceOf(MetadataWithObject::class);
+});
