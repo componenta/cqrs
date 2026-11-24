@@ -35,20 +35,34 @@ final class CqrsLocatedStaticTarget
     }
 }
 
-it('executes the located handler through real DI even when a service has its callable name', function (string $target, string $expected): void {
+it('uses the configured DI invoker to execute located callables and inject additional arguments', function (string $representation, string $expected): void {
+    $services = [
+        CqrsLocatedTargetDependency::class => new CqrsLocatedTargetDependency('injected'),
+    ];
+    $target = match ($representation) {
+        'function name' => 'cqrsLocatedTargetFunction',
+        'static method name' => CqrsLocatedStaticTarget::class . '::handle',
+        'function closure' => cqrsLocatedTargetFunction(...),
+        'static method array' => [CqrsLocatedStaticTarget::class, 'handle'],
+    };
+
+    // A locator that requires native target identity can supply an unambiguous
+    // callable. String specification precedence belongs to the DI invoker.
+    if ($representation === 'function closure') {
+        $services['cqrsLocatedTargetFunction'] = static fn (object $message): string => 'shadow-service';
+    }
+    if ($representation === 'static method array') {
+        $services[CqrsLocatedStaticTarget::class . '::handle'] = static fn (object $message): string => 'shadow-service';
+    }
+
     $container = (new ContainerFactory())->create(
         new Config([], new Environment([])),
-        new DependencyDefinitions([
-            ConfigKey::SERVICES => [
-                $target => static fn (object $message): string => 'shadow-service',
-                CqrsLocatedTargetDependency::class => new CqrsLocatedTargetDependency('injected'),
-            ],
-        ]),
+        new DependencyDefinitions([ConfigKey::SERVICES => $services]),
     )->container;
 
     $invoker = $container->get(CallableInvokerInterface::class);
     $locator = new readonly class ($target) implements CommandHandlerLocatorInterface, QueryHandlerLocatorInterface {
-        public function __construct(private string $target)
+        public function __construct(private mixed $target)
         {
         }
 
@@ -64,6 +78,8 @@ it('executes the located handler through real DI even when a service has its cal
     expect($queries->handle(new stdClass()))->toBe($expected)
         ->and($commands->dispatch(new stdClass())->result?->value)->toBe($expected);
 })->with([
-    'named function' => ['cqrsLocatedTargetFunction', 'function:injected'],
-    'static method' => [CqrsLocatedStaticTarget::class . '::handle', 'static:injected'],
+    'function name' => ['function name', 'function:injected'],
+    'static method name' => ['static method name', 'static:injected'],
+    'function closure with conflicting service ID' => ['function closure', 'function:injected'],
+    'static method array with conflicting service ID' => ['static method array', 'static:injected'],
 ]);

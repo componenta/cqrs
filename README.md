@@ -185,7 +185,7 @@ Retry, lock and transport middleware use this provider. Their attributes need no
 
 A handler's message must occupy the first parameter slot. CQRS supplies that argument and delegates invocation to the configured `CallableInvokerInterface`. The default `CallableInvoker` does not inject missing arguments; a DI-aware custom invoker may supply additional dependencies. Attribute discovery itself does not perform argument injection.
 
-For string-form handlers, CQRS preserves the selected target against a second service lookup: a named function is passed to the invoker as a `Closure`; a static `Class::method` callable becomes `[Class::class, 'method']`, preserving access checks in the invoker's scope. Custom invokers that inspect the raw callable representation must account for this normalization. Creating a `Closure` for a named function on every dispatch can add overhead with reflection-based DI invokers.
+Terminal handlers pass the callable returned by the locator and the message to the configured invoker unchanged. Callable interpretation, visibility checks, and argument resolution belong to the invoker. In DI 5, exact string service IDs take precedence over callable syntax. When native target identity is required, a locator can provide an unambiguous callable, such as a first-class callable or a public static method array.
 
 ## Optional packages
 

@@ -8,7 +8,6 @@ use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
-use Componenta\CQRS\Internal\LocatedHandlerInvoker;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
 
@@ -32,7 +31,7 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
         $handler = $this->locator->locateFor($operation->command);
 
         return $operation->withResult(
-            new OperationResult(LocatedHandlerInvoker::invoke($this->invoker, $handler, $operation->command)),
+            new OperationResult($this->invoker->call($handler, [$operation->command])),
         );
     }
 }
