@@ -13,6 +13,4 @@ interface CommandMetadataProviderInterface
      * @return T|null
      */
     public function get(object|string $command, string $attribute): ?object;
-
-
 }
