@@ -41,9 +41,6 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
             return $this->fallback->resolve($command);
         }
 
-        throw new UnsupportedCommandException(sprintf(
-            'No name resolver supports command "%s".',
-            $command::class,
-        ));
+        throw new UnsupportedCommandException($command);
     }
 }

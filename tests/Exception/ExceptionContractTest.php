@@ -54,8 +54,8 @@ it('exposes a common exception boundary while preserving the existing SPL catego
     'invalid command handler' => fn () => [new InvalidCommandHandlerException('handler'), LogicException::class],
     'invalid query handler' => fn () => [new InvalidQueryHandlerException('handler'), LogicException::class],
     'invalid listener' => fn () => [new InvalidListenerException('listener'), LogicException::class],
-    'unsupported command' => fn () => [new UnsupportedCommandException('command'), InvalidArgumentException::class],
-    'unsupported query' => fn () => [new UnsupportedQueryException('query'), InvalidArgumentException::class],
+    'unsupported command' => fn () => [new UnsupportedCommandException(new stdClass()), InvalidArgumentException::class],
+    'unsupported query' => fn () => [new UnsupportedQueryException(new stdClass()), InvalidArgumentException::class],
     'invalid metadata' => fn () => [new InvalidCommandMetadataException('metadata'), InvalidArgumentException::class],
     'invalid map' => fn () => [new InvalidCqrsMapException('map'), InvalidArgumentException::class],
     'conflicting map' => fn () => [CqrsMapConflictException::handler('command', 'message'), InvalidArgumentException::class],
@@ -114,4 +114,18 @@ it('classifies errors generated at public CQRS boundaries as package-owned excep
     ['invalid map', InvalidCqrsMapException::class],
     ['completed operation update', OperationAlreadyCompletedException::class],
     ['completed operation invocation', OperationAlreadyCompletedException::class],
+]);
+
+it('preserves the unsupported message and explicit failure diagnostics', function (string $exceptionClass, string $property): void {
+    $message = new stdClass();
+    $previous = new RuntimeException('previous failure');
+    $failure = new $exceptionClass($message, 'custom message', $previous);
+
+    expect($failure->{$property})->toBe($message)
+        ->and($failure->getMessage())->toBe('custom message')
+        ->and($failure->getPrevious())->toBe($previous)
+        ->and(fn () => $failure->{$property} = new stdClass())->toThrow(Error::class);
+})->with([
+    'command' => [UnsupportedCommandException::class, 'command'],
+    'query' => [UnsupportedQueryException::class, 'query'],
 ]);

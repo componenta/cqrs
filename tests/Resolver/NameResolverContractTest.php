@@ -38,15 +38,28 @@ final class NameResolverContractProbe implements CommandNameResolverInterface, Q
 
 it('rejects an unsupported message without calling any unsupported resolver', function (string $composite, string $exception): void {
     $message = new stdClass();
-    $unsupported = new $exception('unsupported message');
+    $unsupported = new $exception($message, 'unsupported message');
     $delegate = new NameResolverContractProbe(false, 'delegate', $unsupported);
     $fallback = new NameResolverContractProbe(false, 'fallback', $unsupported);
     $resolver = new $composite($fallback, $delegate);
 
-    expect($resolver->supports($message))->toBeFalse()
-        ->and(fn () => $resolver->resolve($message))->toThrow($exception)
-        ->and($delegate->resolved)->toBe(0)
-        ->and($fallback->resolved)->toBe(0);
+    expect($resolver->supports($message))->toBeFalse();
+
+    try {
+        $resolver->resolve($message);
+    } catch (UnsupportedCommandException|UnsupportedQueryException $caught) {
+        $original = $caught instanceof UnsupportedCommandException ? $caught->command : $caught->query;
+
+        expect($caught)->toBeInstanceOf($exception)
+            ->and($original)->toBe($message)
+            ->and($caught->getMessage())->toBe(sprintf('No name resolver supports %s "%s".', $caught instanceof UnsupportedCommandException ? 'command' : 'query', $message::class))
+            ->and($delegate->resolved)->toBe(0)
+            ->and($fallback->resolved)->toBe(0);
+
+        return;
+    }
+
+    test()->fail('Expected an unsupported message exception.');
 })->with([
     'command' => [CompositeCommandNameResolver::class, UnsupportedCommandException::class],
     'query' => [CompositeQueryNameResolver::class, UnsupportedQueryException::class],

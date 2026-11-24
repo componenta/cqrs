@@ -41,9 +41,6 @@ final class CompositeQueryNameResolver implements QueryNameResolverInterface
             return $this->fallback->resolve($query);
         }
 
-        throw new UnsupportedQueryException(sprintf(
-            'No name resolver supports query "%s".',
-            $query::class,
-        ));
+        throw new UnsupportedQueryException($query);
     }
 }
