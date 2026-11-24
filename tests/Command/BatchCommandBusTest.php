@@ -118,3 +118,78 @@ it('rejects malformed selected attributes before dispatching any command', funct
     'empty string' => [['' => 'value']],
     'whitespace string' => [['   ' => 'value']],
 ]);
+
+
+it('returns an empty list without dispatching anything for an empty batch', function (): void {
+    $inner = new RecordingBatchCommandBus();
+    $bus = new BatchCommandBus($inner);
+
+    expect($bus->dispatchMany([]))->toBe([])
+        ->and($inner->operations)->toBe([]);
+});
+
+it('rejects a malformed later command before dispatching any command', function (): void {
+    $inner = new RecordingBatchCommandBus();
+    $bus = new BatchCommandBus($inner);
+
+    expect(fn () => $bus->dispatchMany([
+        new BatchCommandBusFirstCommand('valid'),
+        'not a command object',
+    ]))->toThrow(InvalidArgumentException::class, 'Batch commands must be objects')
+        ->and($inner->operations)->toBe([]);
+});
+
+it('preserves the input iterator failure without dispatching the valid prefix', function (): void {
+    $inner = new RecordingBatchCommandBus();
+    $bus = new BatchCommandBus($inner);
+    $failure = new RuntimeException('input source failed');
+    $commands = (static function () use ($failure): Generator {
+        yield new BatchCommandBusFirstCommand('valid');
+        throw $failure;
+    })();
+
+    try {
+        $bus->dispatchMany($commands);
+        test()->fail('Expected the input iterator failure.');
+    } catch (RuntimeException $exception) {
+        expect($exception)->toBe($failure)
+            ->and($inner->operations)->toBe([]);
+    }
+});
+
+it('stops dispatching after a command failure without undoing the completed prefix', function (): void {
+    $first = new BatchCommandBusFirstCommand('first');
+    $second = new BatchCommandBusSecondCommand('second');
+    $third = new BatchCommandBusFirstCommand('third');
+    $failure = new RuntimeException('command failed');
+    $inner = new class ($second, $failure) implements CommandBusInterface {
+        public array $attempted = [];
+        public array $completed = [];
+
+        public function __construct(
+            private readonly object $failingCommand,
+            private readonly Throwable $failure,
+        ) {}
+
+        public function dispatch(object $command, array $attributes = []): OperationInterface
+        {
+            $this->attempted[] = $command;
+            if ($command === $this->failingCommand) {
+                throw $this->failure;
+            }
+
+            $this->completed[] = $command;
+
+            return Operation::create($command, $attributes);
+        }
+    };
+
+    try {
+        (new BatchCommandBus($inner))->dispatchMany([$first, $second, $third]);
+        test()->fail('Expected the command failure.');
+    } catch (RuntimeException $exception) {
+        expect($exception)->toBe($failure)
+            ->and($inner->attempted)->toBe([$first, $second])
+            ->and($inner->completed)->toBe([$first]);
+    }
+});
