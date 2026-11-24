@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Resolver;
 
+use Componenta\CQRS\Query\Exception\UnsupportedQueryException;
+
 final class CompositeQueryNameResolver implements QueryNameResolverInterface
 {
     /** @var array<int|string, QueryNameResolverInterface> */
@@ -32,6 +34,13 @@ final class CompositeQueryNameResolver implements QueryNameResolverInterface
             }
         }
 
-        return $this->fallback->resolve($query);
+        if ($this->fallback->supports($query)) {
+            return $this->fallback->resolve($query);
+        }
+
+        throw new UnsupportedQueryException(sprintf(
+            'No name resolver supports query "%s".',
+            $query::class,
+        ));
     }
 }

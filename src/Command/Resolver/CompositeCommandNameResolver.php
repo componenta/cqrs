@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Resolver;
 
+use Componenta\CQRS\Command\Exception\UnsupportedCommandException;
+
 final class CompositeCommandNameResolver implements CommandNameResolverInterface
 {
     /** @var array<int|string, CommandNameResolverInterface> */
@@ -32,6 +34,13 @@ final class CompositeCommandNameResolver implements CommandNameResolverInterface
             }
         }
 
-        return $this->fallback->resolve($command);
+        if ($this->fallback->supports($command)) {
+            return $this->fallback->resolve($command);
+        }
+
+        throw new UnsupportedCommandException(sprintf(
+            'No name resolver supports command "%s".',
+            $command::class,
+        ));
     }
 }
