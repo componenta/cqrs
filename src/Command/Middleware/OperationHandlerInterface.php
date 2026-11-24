@@ -14,8 +14,7 @@ interface OperationHandlerInterface
      * Returns the operation produced by this stage, with a result when
      * completed synchronously. A stage may delegate to another handler.
      *
-     * @throws Throwable If processing fails. The terminal HandleCommandHandler
-     *                  rejects an operation with an existing result before invocation.
+     * @throws Throwable If processing fails.
      */
     public function handle(OperationInterface $operation): OperationInterface;
 }

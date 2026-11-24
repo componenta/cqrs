@@ -22,6 +22,8 @@ interface QueryBusInterface
      * ContextInterface is passed to middleware unchanged. Middleware may return
      * a result without invoking the terminal handler.
      *
+     * Exceptions escaping the pipeline propagate without being wrapped by the bus.
+     *
      * @param ContextInterface|array<string, mixed> $context Per-dispatch middleware attributes.
      * @throws InvalidArgumentException If array context contains invalid attribute names.
      * @throws HandlerNotFoundException If handler lookup is reached and no handler is registered.
@@ -29,8 +31,6 @@ interface QueryBusInterface
      * @throws ContainerExceptionInterface If handler service resolution fails.
      * @throws InvocationExceptionInterface If the DI invoker cannot prepare the call.
      * @throws Throwable Other failures from middleware, resolution or handler execution.
-     *
-     * Exceptions escaping the pipeline propagate without being wrapped by the bus.
      */
     public function handle(object $query, ContextInterface|array $context = []): mixed;
 }

@@ -22,7 +22,7 @@ interface OperationInterface
     /** Unique identifier of the operation, preserved in derived operations. */
     public UuidInterface $id { get; }
 
-    /** UTC creation time of this local operation, not handler start time. */
+    /** Local operation creation time, not handler start time. The default factory uses UTC. */
     public DateTimeImmutable $createdAt { get; }
 
     /**

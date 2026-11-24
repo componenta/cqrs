@@ -23,6 +23,8 @@ interface CommandBusInterface
      * complete or defer a command without invoking its terminal handler.
      * A null operation result is valid for deferred processing.
      *
+     * Exceptions escaping the pipeline propagate without being wrapped by the bus.
+     *
      * @param array<string, mixed> $attributes
      * @throws InvalidArgumentException If attributes contain invalid names.
      * @throws HandlerNotFoundException If handler lookup is reached and no handler is registered.
@@ -31,8 +33,6 @@ interface CommandBusInterface
      * @throws InvocationExceptionInterface If the DI invoker cannot prepare the call.
      * @throws CommandFailureNotificationException If event middleware cannot notify listeners of a downstream failure.
      * @throws Throwable Other failures from operation creation, middleware, resolution or handler execution.
-     *
-     * Exceptions escaping the pipeline propagate without being wrapped by the bus.
      */
     public function dispatch(object $command, array $attributes = []): OperationInterface;
 }
