@@ -19,7 +19,7 @@ $result = $operation->result?->value;
 
 Operation содержит:
 
-- UUID v7 `id`;
+- UUID `id` (по умолчанию UUIDv7);
 - экземпляр `command`;
 - `createdAt` — время создания операции для отправки на обработку (по умолчанию UTC);
 - `attributes` со строгим контрактом `array<string,mixed>`;
@@ -46,13 +46,15 @@ $bus = new Componenta\CQRS\Command\CommandBus(
 
 ### Настройка часов и UUID
 
-Стандартная фабрика операций принимает необязательные часы PSR-20 (`ClockInterface`) и генератор Identity (`UuidFactoryInterface`). Без часов используется текущее время UTC, по умолчанию генерируется UUIDv7.
+Стандартная фабрика операций зависит от часов PSR-20 (`ClockInterface`) и генератора Identity (`UuidFactoryInterface`). По умолчанию используются встроенные `Componenta\CQRS\Clock\UtcClock` и стандартный генератор UUIDv7. Часы не допускают `null`: чтобы использовать реализацию по умолчанию, не передавайте аргумент.
 
 ```php
+use Componenta\CQRS\Clock\UtcClock;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\Identity\UuidFactory;
 
+$clock = new UtcClock();
 $factory = new OperationFactory(clock: $clock, uuidFactory: new UuidFactory());
 $operation = $factory->create($command);
 
@@ -65,7 +67,7 @@ $operation = Operation::create(
 
 `Operation::create()` принимает готовый `DateTimeImmutable` и необязательный UUID Identity; при отсутствии соответствующего значения используются текущее время UTC и UUIDv7. Операция и её неизменяемые копии сохраняют переданные объекты, часовой пояс и микросекунды. Для идентификатора операции используется минимальный `Componenta\Identity\UuidInterface`. Объекты Ramsey UUID больше не удовлетворяют этому контракту.
 
-При использовании провайдера конфигурации CQRS зарегистрированные `Psr\Clock\ClockInterface` и `Componenta\Identity\UuidFactoryInterface` внедряются автоматически. Обработчик получает время после успешного вызова, события — при создании и при первом успешном `stop()`. Часовой пояс настроенных часов сохраняется. Без часов каждый этап использует текущее время UTC. Ошибки часов обрабатываются по действующим правилам исключений команд и слушателей. Нормализация отметок и гарантия монотонности системного времени не предусмотрены.
+При использовании провайдера конфигурации CQRS зарегистрированные `Psr\Clock\ClockInterface` и `Componenta\Identity\UuidFactoryInterface` внедряются автоматически. Обработчик получает время после успешного вызова, события — при создании и при первом успешном `stop()`. Часовой пояс настроенных часов сохраняется. Если сервис часов не зарегистрирован, каждый этап использует `UtcClock`; явно зарегистрированный `null` или сервис неверного типа считается ошибкой конфигурации. Ошибки часов обрабатываются по действующим правилам исключений команд и слушателей. Нормализация отметок и гарантия монотонности системного времени не предусмотрены.
 
 ### Несколько команд
 

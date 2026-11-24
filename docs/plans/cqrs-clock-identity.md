@@ -7,9 +7,9 @@
 
 ## 1. Цель и обязательные требования
 
-- Внедрять PSR-20 ClockInterface опционально в компоненты, создающие операции, результаты и события. Не заменять временные свойства объектами часов.
+- В компоненты, самостоятельно получающие время, внедрять PSR-20 ClockInterface без nullable-типа. По умолчанию использовать Componenta\CQRS\Clock\UtcClock; явный null недопустим. Operation и OperationResult принимают готовые временные отметки и не хранят часы.
 - Принимать готовые DateTimeImmutable; сохранять исходный объект, timezone и микросекунды. Не вызывать setTimezone() над переданным значением.
-- Если временная отметка не передана или равна null, сохранять текущий fallback: системное время UTC.
+- Если в Operation::create или OperationResult не передана временная отметка либо передан null, получать текущее время через UtcClock.
 - Не подменять ошибку ClockInterface::now() системным временем.
 - Заменить прямую зависимость от Ramsey UUID на собственную реализацию componenta/identity.
 - Сохранить имена и порядок существующих параметров; новые параметры — только в конце. Сигнатуры шин, middleware, обработчиков и OperationFactoryInterface не расширять.
@@ -18,9 +18,9 @@
 
 ## 2. Согласованные решения
 
-1. Конструкторное внедрение optional ClockInterface вместо ClockAwareInterface/setClock(). Сохраняется readonly компонентов.
+1. Конструкторное внедрение ClockInterface со значением по умолчанию new UtcClock() вместо nullable-свойств, ClockAwareInterface или setClock(). Сохраняется readonly компонентов.
 2. Operation::create принимает дополнительный готовый UUID, чтобы OperationFactory могла использовать UuidFactoryInterface без хранения генератора внутри операции.
-3. CommandEvent получает опциональные приватные readonly часы от EventMiddleware и самостоятельно фиксирует dispatchedAt при создании, а propagationStoppedAt при первом успешном вызове stop(). Метод stop() не принимает временную отметку. Без часов используется системное время UTC.
+3. CommandEvent получает приватные readonly часы от EventMiddleware и самостоятельно фиксирует dispatchedAt при создании, а propagationStoppedAt при первом успешном вызове stop(). Метод stop() не принимает временную отметку. При отсутствии явно настроенных часов используется UtcClock.
 4. Стандартный генератор — UUID v7; явно настроенный UuidFactoryInterface определяет версию сам. Тип id — минимальный Componenta\Identity\UuidInterface.
 5. UUID v7 и createdAt не обязаны иметь одинаковую временную составляющую: текущий Identity использует собственный источник времени и не принимает timestamp в generate()/v7(). Не менять алгоритм генерации ради их синхронизации.
 6. Для прямого Operation::create без id — повторно используемый приватный генератор по умолчанию; для штатной диспетчеризации — внедрённый или собственный генератор OperationFactory. Не создавать фабрику UUID на каждом dispatch.
@@ -33,12 +33,12 @@
 | Место | Сейчас | После |
 | --- | --- | --- |
 | Operation::create | Ramsey Uuid::uuid7() | Готовый UUID или Identity v7 |
-| Operation::create | now UTC | Готовый createdAt или now UTC |
-| OperationResult::__construct | Готовый processedAt или now UTC | Без изменения алгоритма |
-| CommandEvent::__construct | now UTC | clock->now() или now UTC |
-| CommandEvent::stop | Первое время остановки UTC | clock->now() или now UTC при первом успешном stop() |
+| Operation::create | now UTC | Готовый createdAt или UtcClock |
+| OperationResult::__construct | Готовый processedAt или now UTC | Готовый processedAt или UtcClock |
+| CommandEvent::__construct | now UTC | clock->now() |
+| CommandEvent::stop | Первое время остановки UTC | clock->now() при первом успешном stop() |
 
-Часы нужны OperationFactory, HandleCommandHandler, EventMiddleware. В QueryBus, Context, PipelineHandler, BatchCommandBus, локаторы и резолверы не внедрять: они не получают время самостоятельно.
+Часы нужны OperationFactory, HandleCommandHandler, EventMiddleware и CommandEvent. Встроенный UtcClock — неизменяемая реализация ClockInterface; now() возвращает новый DateTimeImmutable в UTC независимо от часового пояса PHP. Это единственная точка получения системного UTC в рабочем коде CQRS. В QueryBus, Context, PipelineHandler, BatchCommandBus, локаторы и резолверы не внедрять: они не получают время самостоятельно.
 
 Целевые производственные зависимости:
 
@@ -102,10 +102,7 @@ public static function create(
     return new self(
         id: $id,
         command: $command,
-        createdAt: $createdAt ?? new DateTimeImmutable(
-            'now',
-            new DateTimeZone('UTC'),
-        ),
+        createdAt: $createdAt ?? (new UtcClock())->now(),
         attributes: $attributes,
     );
 }
@@ -128,7 +125,7 @@ final readonly class OperationFactory
     implements OperationFactoryInterface
 {
     public function __construct(
-        private ?ClockInterface $clock = null,
+        private ClockInterface $clock = new UtcClock(),
         private UuidFactoryInterface $uuidFactory = new UuidFactory(),
     ) {}
 
@@ -139,8 +136,7 @@ final readonly class OperationFactory
         return Operation::create(
             command: $command,
             attributes: $attributes,
-            createdAt: $this->clock?->now()
-                ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            createdAt: $this->clock->now(),
             id: $this->uuidFactory->generate(),
         );
     }
@@ -149,7 +145,7 @@ final readonly class OperationFactory
 
 Один генератор на экземпляр фабрики. ClockInterface и UuidFactoryInterface — зависимости, а не изменяемые настройки. Каждый create получает новое время и новый id. При исключении now() не вызывать generate(), при сбое любого из источников не создавать операцию и не запускать pipeline. Сохранить исходный Throwable.
 
-OperationFactoryInterface::create(object $command, array $attributes = []): OperationInterface остаётся неизменным. Уточнить документацию: createdAt — момент создания, UTC только по умолчанию; версия UUID определяется генератором, стандартная — v7. Не добавлять требования к версии в минимальный интерфейс.
+OperationFactoryInterface::create(object $command, array $attributes = []): OperationInterface остаётся неизменным. Метод restore() не добавляется: транспортные пакеты передают команду и разрешённый контекст, а не восстанавливают полную операцию. Уточнить документацию: createdAt — момент создания, UTC только по умолчанию; версия UUID определяется генератором, стандартная — v7. Не добавлять требования к версии в минимальный интерфейс.
 
 ## 5. Результаты и события
 
@@ -163,7 +159,7 @@ public function __construct(
     ?DateTimeImmutable $processedAt = null,
 ) {
     $this->processedAt = $processedAt
-        ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        ?? (new UtcClock())->now();
 }
 ~~~
 
@@ -173,7 +169,7 @@ HandleCommandHandler получает последний необязатель�
 public function __construct(
     private CommandHandlerLocatorInterface $locator,
     private CallableInvokerInterface $invoker = new CallableInvoker(),
-    private ?ClockInterface $clock = null,
+    private ClockInterface $clock = new UtcClock(),
 ) {}
 ~~~
 
@@ -185,7 +181,7 @@ $value = $this->invoker->call($handler, [$operation->command]);
 return $operation->withResult(
     new OperationResult(
         $value,
-        processedAt: $this->clock?->now(),
+        processedAt: $this->clock->now(),
     ),
 );
 ~~~
@@ -194,21 +190,15 @@ return $operation->withResult(
 
 ### 5.2. CommandEvent и CommandFailedEvent
 
-Событие само фиксирует момент своего создания через переданный ClockInterface либо системное UTC. Отметку извне не принимает.
+Событие само фиксирует момент своего создания через ClockInterface (UtcClock по умолчанию). Отметку извне не принимает.
 
 ~~~php
 // CommandEvent
 public function __construct(
     public readonly OperationInterface $operation,
-    private readonly ?ClockInterface $clock = null,
+    private readonly ClockInterface $clock = new UtcClock(),
 ) {
-    $this->dispatchedAt = $this->now();
-}
-
-private function now(): DateTimeImmutable
-{
-    return $this->clock?->now()
-        ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $this->dispatchedAt = $this->clock->now();
 }
 ~~~
 
@@ -218,7 +208,7 @@ CommandProcessEvent и CommandProcessedEvent наследуют конструк
 public function __construct(
     OperationInterface $operation,
     public readonly Throwable $exception,
-    ?ClockInterface $clock = null,
+    ClockInterface $clock = new UtcClock(),
 ) {
     parent::__construct($operation, $clock);
 }
@@ -231,7 +221,9 @@ public function __construct(
 ~~~php
 public function stop(): void
 {
-    $this->propagationStoppedAt ??= $this->now();
+    if ($this->propagationStoppedAt === null) {
+        $this->propagationStoppedAt = $this->clock->now();
+    }
 }
 ~~~
 
@@ -243,11 +235,11 @@ public function stop(): void
 public function __construct(
     private CommandListenersLocatorInterface $locator,
     private bool $suppressExceptions = false,
-    private ?ClockInterface $clock = null,
+    private ClockInterface $clock = new UtcClock(),
 ) {}
 ~~~
 
-В каждой существующей ветви execute передаётся одна и та же ссылка на опциональные часы:
+В каждой существующей ветви execute передаётся одна и та же ссылка на часы:
 
 ~~~php
 // До downstream.
@@ -289,13 +281,13 @@ protected function getFactories(): array
 
 Сохранить доступ по обоим существующим идентификаторам, shared instance при get, возможность подмены/декорирования фабрики. Удалить старую invokable-регистрацию.
 
-### 6.2. Разрешение optional dependencies
+### 6.2. Разрешение зависимостей с реализациями по умолчанию
 
 Новая Command\Factory\OperationFactoryFactory::__invoke(ContainerInterface $container): OperationFactory.
 
 | Условие | Действие |
 | --- | --- |
-| ClockInterface отсутствует | null |
+| ClockInterface отсутствует | Создать UtcClock |
 | ClockInterface зарегистрирован | Получить и проверить instanceof ClockInterface |
 | UuidFactoryInterface отсутствует | Создать один стандартный UuidFactory |
 | UuidFactoryInterface зарегистрирован | Использовать полученный объект после проверки типа |
@@ -305,18 +297,16 @@ protected function getFactories(): array
 Пример получения часов с различением отсутствия и ошибочного null:
 
 ~~~php
-$clock = null;
+$clock = $container->has(ClockInterface::class)
+    ? $container->get(ClockInterface::class)
+    : new UtcClock();
 
-if ($container->has(ClockInterface::class)) {
-    $clock = $container->get(ClockInterface::class);
-
-    if (!$clock instanceof ClockInterface) {
-        throw new InvalidConfigurationException(sprintf(
-            'Container entry "%s" must implement %s.',
-            ClockInterface::class,
-            ClockInterface::class,
-        ));
-    }
+if (!$clock instanceof ClockInterface) {
+    throw new InvalidConfigurationException(sprintf(
+        'Container entry "%s" must implement %s.',
+        ClockInterface::class,
+        ClockInterface::class,
+    ));
 }
 ~~~
 
@@ -326,8 +316,8 @@ if ($container->has(ClockInterface::class)) {
 | --- | --- |
 | Command/Factory/OperationFactoryFactory.php | Новый composition factory из § 6.2 |
 | Command/Factory/CommandBusFactory.php | При отсутствии OperationFactoryInterface вызвать новый factory вместо new OperationFactory(), чтобы не проигнорировать настройки |
-| Command/Factory/HandleCommandHandlerFactory.php | Разрешить optional ClockInterface; передать последним аргументом |
-| Command/Factory/EventMiddlewareFactory.php | Разрешить optional ClockInterface через PSR-11 has/get; ContainerValue поддерживает их; передать clock по имени, оставить suppressExceptions |
+| Command/Factory/HandleCommandHandlerFactory.php | Разрешить ClockInterface (UtcClock при отсутствии регистрации); передать последним аргументом |
+| Command/Factory/EventMiddlewareFactory.php | Разрешить ClockInterface через PSR-11 has/get (UtcClock при отсутствии регистрации); передать clock по имени, оставить suppressExceptions |
 | ConfigProvider.php | Регистрация/алиас из § 6.1 |
 
 Если пользователь уже предоставил OperationFactoryInterface, не заменять её и не искать лишние UUID/clock для её создания. CQRS не регистрирует и не переопределяет сами ClockInterface или UuidFactoryInterface: это зона приложения и существующих Clock/Identity ConfigProvider.
@@ -375,6 +365,7 @@ PSR-20 не гарантирует монотонность. Не переста
 
 Производственные файлы:
 - composer.json;
+- src/Clock/UtcClock.php;
 - src/Command/OperationInterface.php, Operation.php, OperationFactory.php, OperationFactoryInterface.php (последний — документация);
 - src/Command/Middleware/HandleCommandHandler.php, EventMiddleware.php;
 - src/Command/Event/CommandEvent.php, CommandFailedEvent.php;
@@ -402,7 +393,7 @@ OperationResult.php — только документация при необх�
 | O02 | Явный createdAt с не-UTC timezone и микросекундами | Исходная идентичность, timezone, offset, microseconds |
 | O03 | Явный id, в том числе alternative UuidInterface | Тот же объект, без конвертации |
 | O04 | Явный id и createdAt | Оба значения сохранены |
-| O05 | OperationFactory без clock | Новый UUID v7, UTC fallback |
+| O05 | OperationFactory без явно заданных часов | Новый UUID v7, UtcClock |
 | O06 | Frozen/sequence clock | Один now на create, исходная дата |
 | O07 | Пользовательский UuidFactoryInterface | Один generate на create, сохранение id, нет fromBytes |
 | O08 | Много операций при замороженном clock | Разные UUID в проверяемом наборе, независимо от createdAt |
@@ -421,8 +412,8 @@ OperationResult.php — только документация при необх�
 | T03 | Handler возвращает null | OperationResult существует, value null |
 | T04 | Завершённая операция | OperationAlreadyCompletedException до locator/invoker/clock |
 | T05 | Handler бросает Throwable | Исходная ошибка, часы результата не вызваны |
-| T06 | Все три события с часами / без | Дата из clock без изменений / UTC fallback; Failed сохраняет exception |
-| T07 | Первый stop с часами / без | Timestamp и isPropagationStopped; дальнейшие слушатели пропущены |
+| T06 | Все три события с пользовательскими часами / по умолчанию | Дата из clock без изменений / UtcClock; Failed сохраняет exception |
+| T07 | Первый stop с пользовательскими часами / по умолчанию | Timestamp и isPropagationStopped; дальнейшие слушатели пропущены |
 | T08 | Повторный stop() после успешной остановки | Первое время неизменно; часы не читаются повторно |
 | T09 | Полный успешный цикл | Отдельные отметки createdAt, Process, processedAt, Processed |
 | T10 | Downstream failure | Process и Failed, нет Processed; Failed после сбоя |
@@ -431,6 +422,8 @@ OperationResult.php — только документация при необх�
 | T13 | Suppression слушателей | Не подавляются ошибки создания событий |
 | T14 | Отложенная команда | Прежнее значение result и порядок событий |
 | T15 | stop() при настроенных часах middleware | Тот же источник времени, читаемый непосредственно в stop(); ошибка часов не изменяет состояние остановки |
+| T16 | Явный null во всех конструкторах с ClockInterface | TypeError |
+| T17 | UtcClock и стандартные пути при не-UTC timezone PHP | Текущее UTC, новый неизменяемый объект, timezone PHP не меняется |
 
 Использовать управляемые sequence clocks с публичным счётчиком, точные значения и идентичность. Для fallback проверять интервал до/после, не sleep и не точное совпадение двух вызовов системных часов. Не требовать UUID timestamp = createdAt.
 
@@ -464,8 +457,8 @@ D03 — интеграционный сценарий с реальными ве
 ## 11. План реализации и выпуск
 
 1. Миграция UUID: Composer, типы, Operation::create с готовым id, fixtures, тесты и документация.
-2. Optional Clock в OperationFactory и HandleCommandHandler; createdAt и processedAt, TDD.
-3. Временные аргументы событий и stop, optional Clock в EventMiddleware, тесты стадий и исключений.
+2. ClockInterface с UtcClock по умолчанию в OperationFactory и HandleCommandHandler; createdAt и processedAt, TDD.
+3. ClockInterface с UtcClock по умолчанию в EventMiddleware и событиях; тесты стадий, stop и исключений.
 4. Интеграция DI 6: новая фабрика, алиас, fallback, тесты отсутствующих/невалидных зависимостей и пользовательских фабрик.
 5. Перепроверка кода и README на двух языках. Pest, PHPStan max, composer validate --strict, production consumer, сравнительные PHPBench. По возможности mutation analysis; явно отразить непроведённые проверки.
 6. До релиза проверить cqrs-app, cqrs-policy, cqrs-retry, cqrs-lock, cqrs-transaction-cycle, cqrs-transport и адаптеры: ограничения Composer, старые UUID-типы, сериализацию, использование id, источники времени. Эта спецификация не подтверждает совместимость или завершение миграции внешних пакетов.
