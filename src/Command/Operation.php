@@ -8,8 +8,8 @@ use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use DateTimeImmutable;
 use DateTimeZone;
 use Componenta\CQRS\Exception\InvalidArgumentException;
-use Ramsey\Uuid\Uuid;
-use Ramsey\Uuid\UuidInterface;
+use Componenta\Identity\UuidFactory;
+use Componenta\Identity\UuidInterface;
 
 final readonly class Operation implements OperationInterface
 {
@@ -41,15 +41,26 @@ final readonly class Operation implements OperationInterface
     }
 
     /**
+     * Creates an operation from supplied values, defaulting to UUIDv7 and current UTC time.
+     *
      * @param array<string, mixed> $attributes
      * @throws InvalidArgumentException If an attribute name is invalid.
      */
-    public static function create(object $command, array $attributes = []): self
-    {
+    public static function create(
+        object $command,
+        array $attributes = [],
+        ?DateTimeImmutable $createdAt = null,
+        ?UuidInterface $id = null,
+    ): self {
+        if ($id === null) {
+            static $defaultUuidFactory = null;
+            $id = ($defaultUuidFactory ??= new UuidFactory())->generate();
+        }
+
         return new self(
-            id: Uuid::uuid7(),
+            id: $id,
             command: $command,
-            createdAt: new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            createdAt: $createdAt ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
             attributes: $attributes,
         );
     }

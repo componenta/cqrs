@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Tests\Fixture;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
 use DateTimeImmutable;
-use Ramsey\Uuid\UuidInterface;
+use Componenta\Identity\UuidInterface;
 
 /** An alternative operation implementation that delegates the immutable value contract. */
 final class DecoratedOperation implements OperationInterface

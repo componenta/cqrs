@@ -7,7 +7,7 @@ namespace Componenta\CQRS\Command;
 use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use Componenta\CQRS\Exception\InvalidArgumentException;
 use DateTimeImmutable;
-use Ramsey\Uuid\UuidInterface;
+use Componenta\Identity\UuidInterface;
 
 /**
  * Immutable command dispatch context.
@@ -22,7 +22,7 @@ interface OperationInterface
     /** Unique identifier of the operation, preserved in derived operations. */
     public UuidInterface $id { get; }
 
-    /** Local operation creation time, not handler start time. The default factory uses UTC. */
+    /** Operation creation time, not handler start time. UTC is the default when no clock is supplied. */
     public DateTimeImmutable $createdAt { get; }
 
     /**

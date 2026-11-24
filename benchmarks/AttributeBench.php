@@ -11,8 +11,8 @@ use Componenta\CQRS\Query\Context\Context;
 use DateTimeImmutable;
 use DateTimeZone;
 use PhpBench\Attributes as Bench;
-use Ramsey\Uuid\Uuid;
-use Ramsey\Uuid\UuidInterface;
+use Componenta\Identity\UuidFactory;
+use Componenta\Identity\UuidInterface;
 use stdClass;
 
 #[Bench\BeforeMethods('prepare')]
@@ -43,7 +43,7 @@ final class AttributeBench
         for ($i = 0; $i < $params['size']; ++$i) {
             $this->attributes['key.' . $i] = $i;
         }
-        $this->id = Uuid::uuid7();
+        $this->id = (new UuidFactory())->generate();
         $this->command = new stdClass();
         $this->createdAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         $this->result = new OperationResult('done', $this->createdAt);
