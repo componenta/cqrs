@@ -133,3 +133,28 @@ it('filters listener events before container access and resolves matching descri
     expect(iterator_to_array($locator->locateFor($event)))->toBe([$listener, $listener])
         ->and($container->gets)->toBe(['listener.matching' => 2]);
 });
+
+
+it('preserves sorted listener multiplicity for every lifecycle event and resolves services only while iterating', function (): void {
+    $command = new RuntimeLocatorTestCommand();
+    $operation = Operation::create($command);
+    $first = new RuntimeLocatorTestListener();
+    $second = new RuntimeLocatorTestListener();
+    $third = new RuntimeLocatorTestListener();
+    $container = new RuntimeLocatorTestContainer(['first' => $first, 'second' => $second, 'third' => $third]);
+    $locator = new CommandListenersLocator([
+        RuntimeLocatorTestCommand::class => [
+            ['service' => 'third', 'events' => [], 'priority' => -1],
+            ['service' => 'first', 'events' => [CommandProcessEvent::class, CommandFailedEvent::class], 'priority' => 4],
+            ['service' => 'first', 'events' => [], 'priority' => 2],
+            ['service' => 'second', 'events' => [CommandProcessedEvent::class], 'priority' => 3],
+        ],
+    ], $container);
+
+    $process = $locator->locateFor(new CommandProcessEvent($operation));
+    expect($container->gets)->toBe([])
+        ->and(iterator_to_array($process))->toBe([$first, $first, $third])
+        ->and(iterator_to_array($locator->locateFor(new CommandProcessedEvent($operation))))->toBe([$second, $first, $third])
+        ->and(iterator_to_array($locator->locateFor(new CommandFailedEvent($operation, new RuntimeException('failed')))))->toBe([$first, $first, $third])
+        ->and($container->gets)->toBe(['first' => 5, 'third' => 3, 'second' => 1]);
+});
