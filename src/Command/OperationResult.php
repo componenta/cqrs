@@ -16,7 +16,7 @@ final readonly class OperationResult
 
     /**
      * @param mixed $value Handler return value
-     * @param DateTimeImmutable|null $processedAt Completion timestamp (defaults to now)
+     * @param DateTimeImmutable|null $processedAt Completion timestamp (defaults to current UTC time)
      */
     public function __construct(
         public mixed $value,

@@ -11,6 +11,7 @@ use Componenta\CQRS\Command\Event\CommandProcessEvent;
 use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Throwable;
+use Psr\Clock\ClockInterface;
 
 /** Dispatches command lifecycle events around downstream command execution. */
 final readonly class EventMiddleware implements MiddlewareInterface
@@ -22,6 +23,7 @@ final readonly class EventMiddleware implements MiddlewareInterface
     public function __construct(
         private CommandListenersLocatorInterface $locator,
         private bool $suppressExceptions = false,
+        private ?ClockInterface $clock = null,
     ) {}
 
     /**
@@ -34,13 +36,13 @@ final readonly class EventMiddleware implements MiddlewareInterface
      */
     public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
     {
-        $this->dispatch(new CommandProcessEvent($operation));
+        $this->dispatch(new CommandProcessEvent($operation, $this->clock));
 
         try {
             $operation = $handler->handle($operation);
         } catch (Throwable $exception) {
             try {
-                $this->dispatch(new CommandFailedEvent($operation, $exception));
+                $this->dispatch(new CommandFailedEvent($operation, $exception, $this->clock));
             } catch (Throwable $notificationFailure) {
                 throw new CommandFailureNotificationException($exception, $notificationFailure);
             }
@@ -48,7 +50,7 @@ final readonly class EventMiddleware implements MiddlewareInterface
             throw $exception;
         }
 
-        $this->dispatch(new CommandProcessedEvent($operation));
+        $this->dispatch(new CommandProcessedEvent($operation, $this->clock));
 
         return $operation;
     }

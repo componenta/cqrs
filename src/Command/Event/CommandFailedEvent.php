@@ -6,6 +6,7 @@ namespace Componenta\CQRS\Command\Event;
 
 use Componenta\CQRS\Command\OperationInterface;
 use Throwable;
+use Psr\Clock\ClockInterface;
 
 final class CommandFailedEvent extends CommandEvent
 {
@@ -18,7 +19,8 @@ final class CommandFailedEvent extends CommandEvent
     public function __construct(
         OperationInterface $operation,
         public readonly Throwable $exception,
+        ?ClockInterface $clock = null,
     ) {
-        parent::__construct($operation);
+        parent::__construct($operation, $clock);
     }
 }

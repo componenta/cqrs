@@ -7,6 +7,7 @@ namespace Componenta\CQRS\Command\Event;
 use Componenta\CQRS\Command\OperationInterface;
 use DateTimeImmutable;
 use DateTimeZone;
+use Psr\Clock\ClockInterface;
 
 /**
  * Base class for all command lifecycle events dispatched by {@see EventMiddleware}.
@@ -31,14 +32,14 @@ class CommandEvent
     }
 
     /**
-     * UTC timestamp of when this event was instantiated.
+     * Timestamp of when this event was instantiated (UTC without a clock).
      *
-     * Useful for measuring listener latency or auditing dispatch timing.
+     * Useful for auditing dispatch timing. Wall-clock values are not monotonic.
      */
     public readonly DateTimeImmutable $dispatchedAt;
 
     /**
-     * UTC timestamp of when propagation was stopped, or null if it hasn't been.
+     * Timestamp of the first successful stop, or null if propagation has not stopped.
      *
      * Kept separate from the boolean flag so callers can determine
      * *when* propagation was stopped, not just *whether* it was.
@@ -51,8 +52,9 @@ class CommandEvent
      */
     public function __construct(
         public readonly OperationInterface $operation,
+        private readonly ?ClockInterface $clock = null,
     ) {
-        $this->dispatchedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $this->dispatchedAt = $this->now();
     }
 
     /**
@@ -64,7 +66,12 @@ class CommandEvent
     public function stop(): void
     {
         if ($this->propagationStoppedAt === null) {
-            $this->propagationStoppedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+            $this->propagationStoppedAt = $this->now();
         }
+    }
+
+    private function now(): DateTimeImmutable
+    {
+        return $this->clock?->now() ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
     }
 }

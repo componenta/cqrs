@@ -11,12 +11,14 @@ use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
+use Psr\Clock\ClockInterface;
 
 final readonly class HandleCommandHandler implements OperationHandlerInterface
 {
     public function __construct(
         private CommandHandlerLocatorInterface $locator,
         private CallableInvokerInterface $invoker = new CallableInvoker(),
+        private ?ClockInterface $clock = null,
     ) {
     }
 
@@ -35,8 +37,10 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
 
         $handler = $this->locator->locateFor($operation->command);
 
+        $value = $this->invoker->call($handler, [$operation->command]);
+
         return $operation->withResult(
-            new OperationResult($this->invoker->call($handler, [$operation->command])),
+            new OperationResult($value, processedAt: $this->clock?->now()),
         );
     }
 }
