@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Command\Middleware\MiddlewareInterface;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\Middleware\PipelineHandler;
@@ -20,7 +19,7 @@ final readonly class CommandBus implements CommandBusInterface
      * @param OperationHandlerInterface $commandHandler Terminal command operation handler.
      * @param list<MiddlewareInterface> $middlewares Middleware in execution order.
      * @param OperationFactoryInterface|null $operationFactory Custom operation factory.
-     * @throws ExceptionInterface If middlewares is not a list of MiddlewareInterface instances.
+     * @throws InvalidArgumentException If middlewares is not a list of MiddlewareInterface instances.
      */
     public function __construct(
         OperationHandlerInterface $commandHandler,

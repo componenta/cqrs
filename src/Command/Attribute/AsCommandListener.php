@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Attribute;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
 use Attribute;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
@@ -20,7 +19,7 @@ final readonly class AsCommandListener
     /**
      * @param non-empty-string $command Command class or logical command name.
      * @param list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes Empty matches every lifecycle event.
-     * @throws ExceptionInterface If the command name or event type list is invalid.
+     * @throws InvalidArgumentException If the command name or event type list is invalid.
      */
     public function __construct(
         public string $command,
@@ -44,7 +43,7 @@ final readonly class AsCommandListener
     /**
      * @param array<array-key, mixed> $eventTypes
      * @phpstan-assert list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes
-     * @throws ExceptionInterface
+     * @throws InvalidArgumentException
      */
     public static function assertEventTypes(array $eventTypes): void
     {

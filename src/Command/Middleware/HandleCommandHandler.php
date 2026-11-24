@@ -23,8 +23,9 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
     /**
      * Locates and invokes the command handler, then records its result.
      *
-     * @throws ExceptionInterface If CQRS cannot execute the operation.
-     * @throws \Throwable Other failures from lookup or invocation.
+     * @throws OperationAlreadyCompletedException If the operation already has a result.
+     * @throws ExceptionInterface Other CQRS failures during processing.
+     * @throws \Throwable Other failures from lookup, invocation or result creation.
      */
     public function handle(OperationInterface $operation): OperationInterface
     {

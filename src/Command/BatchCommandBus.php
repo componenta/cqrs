@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
@@ -28,7 +27,7 @@ final readonly class BatchCommandBus implements CommandBusInterface
      * @param iterable<object> $commands
      * @param array<class-string, mixed> $attributes Selected entries must contain arrays; validated before dispatch.
      * @return list<OperationInterface>
-     * @throws ExceptionInterface If a command or its selected attributes are invalid.
+     * @throws InvalidArgumentException If a command or its selected attributes are invalid.
      * @throws \Throwable If input iteration or dispatch fails. Dispatch stops at the first failure;
      *                     already dispatched commands are not rolled back.
      */

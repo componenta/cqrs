@@ -9,7 +9,7 @@ use Componenta\CQRS\Command\Attribute\AsCommandListener;
 use Componenta\CQRS\ConfigKey;
 use Componenta\CQRS\Map\Exception\CqrsMapConflictException;
 use Componenta\CQRS\Map\Exception\InvalidCqrsMapException;
-use Componenta\CQRS\Exception\ExceptionInterface;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
  * @internal
@@ -178,7 +178,7 @@ final class RegistrationNormalizer
         }
         try {
             AsCommandListener::assertEventTypes($listener['events']);
-        } catch (ExceptionInterface $exception) {
+        } catch (InvalidArgumentException $exception) {
             throw new InvalidCqrsMapException($context . ': ' . $exception->getMessage(), previous: $exception);
         }
         // array_unique()/array_values() preserve references from input arrays.

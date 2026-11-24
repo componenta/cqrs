@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Context;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
@@ -20,7 +19,7 @@ final readonly class Context implements ContextInterface
 
     /**
      * @param array<string, mixed> $attributes
-     * @throws ExceptionInterface If an attribute name is invalid.
+     * @throws InvalidArgumentException If an attribute name is invalid.
      */
     public function __construct(array $attributes = [])
     {

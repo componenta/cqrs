@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Metadata;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
 use Attribute;
 use Componenta\CQRS\Command\Exception\InvalidCommandMetadataException;
 use ReflectionAttribute;
@@ -23,7 +22,7 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
      * @template T of object
      * @param class-string<T> $attribute
      * @return T|null
-     * @throws ExceptionInterface If the metadata cannot be read or materialized.
+     * @throws InvalidCommandMetadataException If the metadata cannot be read or materialized.
      */
     public function get(object|string $command, string $attribute): ?object
     {
