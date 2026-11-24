@@ -19,6 +19,7 @@ final readonly class CommandBus implements CommandBusInterface
      * @param OperationHandlerInterface $commandHandler Terminal command operation handler.
      * @param list<MiddlewareInterface> $middlewares Middleware in execution order.
      * @param OperationFactoryInterface|null $operationFactory Custom operation factory.
+     * @throws InvalidArgumentException If middlewares is not a list of MiddlewareInterface instances.
      */
     public function __construct(
         OperationHandlerInterface $commandHandler,

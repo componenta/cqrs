@@ -18,7 +18,8 @@ final readonly class AsCommandListener
 
     /**
      * @param non-empty-string $command Command class or logical command name.
-     * @param list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes
+     * @param list<class-string<CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent>> $eventTypes Empty matches every lifecycle event.
+     * @throws InvalidArgumentException If the command name or event type list is invalid.
      */
     public function __construct(
         public string $command,

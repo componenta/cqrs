@@ -24,7 +24,14 @@ final readonly class EventMiddleware implements MiddlewareInterface
         private bool $suppressExceptions = false,
     ) {}
 
-    /** @throws Throwable */
+    /**
+     * Emits the process event before delegation and the processed event on success.
+     * A downstream failure emits the failed event before propagation. A failure in
+     * the process or processed listener does not emit a second failed event.
+     *
+     * @throws CommandFailureNotificationException If notifying a downstream failure also fails.
+     * @throws Throwable If downstream processing, lookup or an unsuppressed listener fails.
+     */
     public function execute(OperationInterface $operation, OperationHandlerInterface $handler): OperationInterface
     {
         $this->dispatch(new CommandProcessEvent($operation));

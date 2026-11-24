@@ -15,6 +15,7 @@ final class ReflectionCommandMetadataProvider implements CommandMetadataProvider
      * @template T of object
      * @param class-string<T> $attribute
      * @return T|null
+     * @throws InvalidCommandMetadataException If the metadata cannot be read or materialized.
      */
     public function get(object|string $command, string $attribute): ?object
     {

@@ -5,20 +5,24 @@ declare(strict_types=1);
 namespace Componenta\CQRS\Command;
 
 use DateTimeImmutable;
+use InvalidArgumentException;
 use Ramsey\Uuid\UuidInterface;
+use RuntimeException;
 
 /**
  * Immutable command dispatch context.
  *
- * Operation identity and creation time describe one dispatch. Handler completion
- * is represented separately by OperationResult::processedAt.
+ * Each with/without method returns a new operation without changing the original.
+ * Derived operations preserve the identifier, creation time, and command instance.
+ * Attribute changes preserve the result. Result changes preserve the attributes.
+ * Immutability is shallow: command and attribute objects are not deep-cloned.
  */
 interface OperationInterface
 {
-    /** Unique operation identifier used for tracing and idempotency. */
+    /** Unique identifier of the operation, preserved in derived operations. */
     public UuidInterface $id { get; }
 
-    /** Timestamp when this operation object was created for dispatch. */
+    /** UTC creation time of this local operation, not handler start time. */
     public DateTimeImmutable $createdAt { get; }
 
     /**
@@ -30,20 +34,41 @@ interface OperationInterface
     /** Command associated with this operation. */
     public object $command { get; }
 
-    /** @var array<string, mixed> */
+    /**
+     * Attribute names are non-empty strings, excluding whitespace-only names
+     * and strings that PHP converts to integer array keys.
+     *
+     * @var array<string, mixed>
+     */
     public array $attributes { get; }
 
     /**
      * Returns a new operation with the result set.
      *
-     * @throws \RuntimeException If this operation already has a result.
+     * @throws RuntimeException If this operation already has a result.
      */
     public function withResult(OperationResult $result): OperationInterface;
 
-    /** @param array<string, mixed> $attributes Complete replacement attributes. */
+    /**
+     * Returns a new operation with all attributes replaced.
+     *
+     * @param array<string, mixed> $attributes
+     * @throws InvalidArgumentException If any attribute name is invalid.
+     */
     public function withAttributes(array $attributes): OperationInterface;
 
+    /**
+     * Returns a new operation with one attribute added or replaced.
+     *
+     * @throws InvalidArgumentException If the attribute name is invalid.
+     */
     public function withAttribute(string $name, mixed $value): OperationInterface;
 
+    /**
+     * Returns a new operation without the named attribute.
+     * A missing valid name leaves the attribute values unchanged.
+     *
+     * @throws InvalidArgumentException If the attribute name is invalid.
+     */
     public function withoutAttribute(string $name): OperationInterface;
 }

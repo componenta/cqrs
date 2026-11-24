@@ -29,7 +29,7 @@ final readonly class AsQueryHandler
 {
     /**
      * Optional explicit query class name.
-     * If null, locator will try to infer from method signature or __invoke parameter.
+     * If null, attribute discovery can infer the name from the handler's first parameter.
      */
     public function __construct(
         public ?string $query = null

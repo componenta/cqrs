@@ -15,7 +15,10 @@ final readonly class Operation implements OperationInterface
     /** @var array<string, mixed> */
     public private(set) array $attributes;
 
-    /** @param array<string, mixed> $attributes */
+    /**
+     * @param array<string, mixed> $attributes
+     * @throws InvalidArgumentException If an attribute name is invalid.
+     */
     public function __construct(
         public UuidInterface $id,
         public object $command,
@@ -33,7 +36,10 @@ final readonly class Operation implements OperationInterface
         $this->attributes = $snapshot;
     }
 
-    /** @param array<string, mixed> $attributes */
+    /**
+     * @param array<string, mixed> $attributes
+     * @throws InvalidArgumentException If an attribute name is invalid.
+     */
     public static function create(object $command, array $attributes = []): self
     {
         return new self(

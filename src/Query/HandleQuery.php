@@ -16,6 +16,13 @@ final readonly class HandleQuery
     ) {
     }
 
+    /**
+     * Locates and invokes the query handler, returning its result unchanged.
+     *
+     * @throws \Componenta\CQRS\Query\Exception\HandlerNotFoundException
+     * @throws \Componenta\CQRS\Query\Exception\InvalidHandlerException
+     * @throws \Throwable Other failures from lookup or invocation.
+     */
     public function __invoke(object $query): mixed
     {
         return $this->invoker->call($this->locator->locateFor($query), [$query]);

@@ -17,7 +17,10 @@ final readonly class Context implements ContextInterface
     /** @var array<string, mixed> */
     public array $attributes;
 
-    /** @param array<string, mixed> $attributes */
+    /**
+     * @param array<string, mixed> $attributes
+     * @throws InvalidArgumentException If an attribute name is invalid.
+     */
     public function __construct(array $attributes = [])
     {
         self::assertAttributes($attributes);

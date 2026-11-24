@@ -27,6 +27,9 @@ final readonly class BatchCommandBus implements CommandBusInterface
      * @param iterable<object> $commands
      * @param array<class-string, mixed> $attributes Selected entries must contain arrays; validated before dispatch.
      * @return list<OperationInterface>
+     * @throws InvalidArgumentException If a command or its selected attributes are invalid.
+     * @throws \Throwable If input iteration or dispatch fails. Dispatch stops at the first failure;
+     *                     already dispatched commands are not rolled back.
      */
     public function dispatchMany(iterable $commands, array $attributes = []): array
     {

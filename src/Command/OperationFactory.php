@@ -21,6 +21,7 @@ final readonly class OperationFactory implements OperationFactoryInterface
      * @param object $command
      * @param array<string, mixed> $attributes
      * @return OperationInterface New operation instance
+     * @throws \InvalidArgumentException If an attribute name is invalid.
      */
     public function create(object $command, array $attributes = []): OperationInterface
     {
