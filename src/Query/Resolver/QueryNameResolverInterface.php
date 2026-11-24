@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Resolver;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
+use Componenta\CQRS\Query\Exception\UnsupportedQueryException;
 
 /** Resolves the logical name used to look up a query. */
 interface QueryNameResolverInterface
@@ -26,7 +26,7 @@ interface QueryNameResolverInterface
      * The returned string is used as the lookup key. It is not a promise that
      * a handler exists. A resolver must reject a message it does not support.
      *
-     * @throws ExceptionInterface If the query is not supported.
+     * @throws UnsupportedQueryException If the query is not supported.
      * @throws \Throwable If name resolution fails for another reason.
      */
     public function resolve(object $query): string;

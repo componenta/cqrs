@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query\Context;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 
 /**
  * Immutable key-value context propagated through query middleware.
@@ -31,7 +31,7 @@ interface ContextInterface
     /**
      * Returns a new context with one attribute added or replaced.
      *
-     * @throws ExceptionInterface If the attribute name is invalid.
+     * @throws InvalidArgumentException If the attribute name is invalid.
      */
     public function withAttribute(string $name, mixed $value): static;
 
@@ -39,7 +39,7 @@ interface ContextInterface
      * Returns a new context with all attributes replaced.
      *
      * @param array<string, mixed> $attributes
-     * @throws ExceptionInterface If any attribute name is invalid.
+     * @throws InvalidArgumentException If any attribute name is invalid.
      */
     public function withAttributes(array $attributes): static;
 
@@ -47,7 +47,7 @@ interface ContextInterface
      * Returns a new context without the named attribute.
      * A missing valid name leaves the attribute values unchanged.
      *
-     * @throws ExceptionInterface If the attribute name is invalid.
+     * @throws InvalidArgumentException If the attribute name is invalid.
      */
     public function withoutAttribute(string $name): static;
 }

@@ -176,7 +176,7 @@ The default array locators use an injected name resolver only when it supports t
 
 ## Failure contracts
 
-The command and query buses propagate failures from the relevant processing stage without wrapping them. The package-wide `Componenta\CQRS\Exception\ExceptionInterface` extends `Throwable` and marks all CQRS-owned exceptions. Public contracts expose this interface for CQRS failures and `Throwable` for other failures, independently of the configured container and invoker. Concrete CQRS exceptions remain available for more specific handling and retain their SPL parent types. External exceptions are not made CQRS exceptions merely because they propagate through a bus. Handler lookup failures apply only if processing reaches the terminal handler:
+The command and query buses propagate failures from the relevant processing stage without wrapping them. The package-wide `Componenta\CQRS\Exception\ExceptionInterface` extends `Throwable` and marks all CQRS-owned exceptions. The bus contracts expose this interface for CQRS failures and `Throwable` for other failures, independently of the configured container and invoker. Narrower contracts declare specific CQRS exceptions when the failure is part of their semantics (for example, unsupported messages, missing handlers, invalid arguments or completed operations). Other failures, where applicable, are covered by `Throwable`. Concrete CQRS exceptions remain available for more specific handling and retain their SPL parent types. External exceptions are not made CQRS exceptions merely because they propagate through a bus. Handler lookup failures apply only if processing reaches the terminal handler:
 
 | Situation | Exception |
 | --- | --- |

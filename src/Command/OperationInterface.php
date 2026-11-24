@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
+use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
+use Componenta\CQRS\Exception\InvalidArgumentException;
 use DateTimeImmutable;
 use Ramsey\Uuid\UuidInterface;
 
@@ -44,7 +45,7 @@ interface OperationInterface
     /**
      * Returns a new operation with the result set.
      *
-     * @throws ExceptionInterface If this operation already has a result.
+     * @throws OperationAlreadyCompletedException If this operation already has a result.
      */
     public function withResult(OperationResult $result): OperationInterface;
 
@@ -52,14 +53,14 @@ interface OperationInterface
      * Returns a new operation with all attributes replaced.
      *
      * @param array<string, mixed> $attributes
-     * @throws ExceptionInterface If any attribute name is invalid.
+     * @throws InvalidArgumentException If any attribute name is invalid.
      */
     public function withAttributes(array $attributes): OperationInterface;
 
     /**
      * Returns a new operation with one attribute added or replaced.
      *
-     * @throws ExceptionInterface If the attribute name is invalid.
+     * @throws InvalidArgumentException If the attribute name is invalid.
      */
     public function withAttribute(string $name, mixed $value): OperationInterface;
 
@@ -67,7 +68,7 @@ interface OperationInterface
      * Returns a new operation without the named attribute.
      * A missing valid name leaves the attribute values unchanged.
      *
-     * @throws ExceptionInterface If the attribute name is invalid.
+     * @throws InvalidArgumentException If the attribute name is invalid.
      */
     public function withoutAttribute(string $name): OperationInterface;
 }

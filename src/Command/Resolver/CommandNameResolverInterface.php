@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Resolver;
 
-use Componenta\CQRS\Exception\ExceptionInterface;
+use Componenta\CQRS\Command\Exception\UnsupportedCommandException;
 
 /** Resolves the logical name used to look up a command. */
 interface CommandNameResolverInterface
@@ -26,7 +26,7 @@ interface CommandNameResolverInterface
      * The returned string is used as the lookup key. It is not a promise that
      * a handler exists. A resolver must reject a message it does not support.
      *
-     * @throws ExceptionInterface If the command is not supported.
+     * @throws UnsupportedCommandException If the command is not supported.
      * @throws \Throwable If name resolution fails for another reason.
      */
     public function resolve(object $command): string;
