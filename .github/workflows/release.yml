@@ -39,9 +39,10 @@ jobs:
           composer require 'componenta/di:^6.0@dev' --no-update --no-interaction
       - run: composer install --no-interaction --prefer-dist
       - run: composer show componenta/di
+      - run: composer audit --locked --no-interaction
       - run: composer test
       - run: composer analyse
-      - name: Measure baseline and candidate with the same dependencies
+      - name: Measure comparable baseline and candidate
         if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'perf:')
         shell: bash
         env:
@@ -53,13 +54,29 @@ jobs:
           if [ -n "$override" ]; then BASE_SHA="$override"; fi
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          mkdir -p "$RUNNER_TEMP/cqrs-baseline"
-          git archive "$BASE_SHA" src | tar -x -C "$RUNNER_TEMP/cqrs-baseline"
-          echo '=== Baseline source ==='
-          set -o pipefail
-          CQRS_BENCH_SOURCE="$RUNNER_TEMP/cqrs-baseline/src" composer bench | tee "$RUNNER_TEMP/cqrs-baseline.log"
-          php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-baseline.log"
-          echo '=== Candidate source ==='
+          set -euo pipefail
+          baseline="$(mktemp -d "$RUNNER_TEMP/cqrs-baseline.XXXXXX")"
+          trap 'rm -rf "$baseline"' EXIT
+          if git diff --quiet "$BASE_SHA" HEAD -- composer.json benchmarks phpbench.json.dist; then
+            # Identical dependencies and fixtures: reuse the candidate vendor.
+            git archive "$BASE_SHA" src | tar -x -C "$baseline"
+            CQRS_BENCH_SOURCE="$baseline/src" composer bench | tee "$RUNNER_TEMP/cqrs-baseline.log"
+            php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-baseline.log"
+          else
+            # A changed dependency or benchmark fixture requires its own checkout.
+            git archive "$BASE_SHA" | tar -x -C "$baseline"
+            if [ -d .ci/di6 ]; then
+              repository="$(php -r 'echo json_encode(["type"=>"path","url"=>$argv[1],"options"=>["symlink"=>false,"versions"=>["componenta/di"=>"6.0.x-dev"]]], JSON_THROW_ON_ERROR);' "$GITHUB_WORKSPACE/.ci/di6")"
+              composer config --working-dir="$baseline" repositories.di6 "$repository"
+              composer require --working-dir="$baseline" 'componenta/di:^6.0@dev' --no-update --no-interaction
+            fi
+            composer install --working-dir="$baseline" --no-interaction --prefer-dist
+            php benchmarks/compare-dependencies.php "$baseline/composer.lock" composer.lock
+            echo "=== Baseline: $BASE_SHA ==="
+            composer --working-dir="$baseline" bench | tee "$RUNNER_TEMP/cqrs-baseline.log"
+            php "$baseline/benchmarks/check-report.php" "$RUNNER_TEMP/cqrs-baseline.log"
+          fi
+          echo "=== Candidate: $GITHUB_SHA ==="
           composer bench | tee "$RUNNER_TEMP/cqrs-candidate.log"
           php benchmarks/check-report.php "$RUNNER_TEMP/cqrs-candidate.log"
       - name: Verify benchmark suite
@@ -117,6 +134,7 @@ jobs:
             composer require --working-dir="$workspace/consumer" 'componenta/di:^6.0@dev' --no-update --no-interaction
           fi
           composer update --working-dir="$workspace/consumer" --no-dev --prefer-lowest --prefer-stable --no-interaction --prefer-dist
+          composer audit --working-dir="$workspace/consumer" --locked --no-dev --no-interaction
           php tests/consumer-smoke.php "$workspace/consumer/vendor/autoload.php"
 
   publish:

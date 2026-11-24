@@ -16,6 +16,7 @@ $expected = [
     'RuntimeBench' => 9,
     'RegistrationBench' => 3,
     'RoutingBench' => 26,
+    'OperationLifecycleBench' => 11,
 ];
 foreach ($expected as $class => $count) {
     preg_match_all('/^\|\s*' . preg_quote($class, '/') . '\s*\|/m', $report, $rows);
