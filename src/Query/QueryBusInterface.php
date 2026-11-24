@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Query\Context\ContextInterface;
-use Componenta\CQRS\Query\Exception\HandlerNotFoundException;
-use Componenta\CQRS\Query\Exception\InvalidHandlerException;
-use Componenta\DI\Exception\ExceptionInterface as InvocationExceptionInterface;
-use InvalidArgumentException;
-use Psr\Container\ContainerExceptionInterface;
 use Throwable;
 
 /** Handles queries through the configured processing pipeline. */
@@ -25,12 +21,9 @@ interface QueryBusInterface
      * Exceptions escaping the pipeline propagate without being wrapped by the bus.
      *
      * @param ContextInterface|array<string, mixed> $context Per-dispatch middleware attributes.
-     * @throws InvalidArgumentException If array context contains invalid attribute names.
-     * @throws HandlerNotFoundException If handler lookup is reached and no handler is registered.
-     * @throws InvalidHandlerException If a registered handler cannot be located as a callable.
-     * @throws ContainerExceptionInterface If handler service resolution fails.
-     * @throws InvocationExceptionInterface If the DI invoker cannot prepare the call.
-     * @throws Throwable Other failures from middleware, resolution or handler execution.
+     * @throws ExceptionInterface If CQRS cannot process the query, for example because
+     *                            the input is invalid, a handler is missing, or its registration is invalid.
+     * @throws Throwable If any other failure escapes the processing pipeline.
      */
     public function handle(object $query, ContextInterface|array $context = []): mixed;
 }

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Locator;
 
-use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
-use Componenta\CQRS\Command\Exception\InvalidHandlerException;
-use Psr\Container\ContainerExceptionInterface;
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Throwable;
 
 /** Locates the handler for a command; does not execute it. */
@@ -20,10 +18,8 @@ interface CommandHandlerLocatorInterface
      * represented by null. A matching registration does not guarantee
      * that the handler's dependencies or invocation arguments can be resolved.
      *
-     * @throws HandlerNotFoundException If no handler is registered for the resolved name.
-     * @throws InvalidHandlerException If the mapped service is not a callable matching its descriptor.
-     * @throws ContainerExceptionInterface If the mapped service cannot be resolved.
-     * @throws Throwable Other failures from name or service resolution.
+     * @throws ExceptionInterface If no handler can be located or its registration is invalid.
+     * @throws Throwable Other failures during lookup or name resolution.
      */
     public function locateFor(object $command): callable;
 }

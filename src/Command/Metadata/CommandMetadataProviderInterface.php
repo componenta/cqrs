@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Metadata;
 
-use Componenta\CQRS\Command\Exception\InvalidCommandMetadataException;
+use Componenta\CQRS\Exception\ExceptionInterface;
 
 /** Reads command metadata independently of handler registration. */
 interface CommandMetadataProviderInterface
@@ -20,8 +20,9 @@ interface CommandMetadataProviderInterface
      * @param object|string $command A command instance or its class name.
      * @param class-string<T> $attribute
      * @return T|null
-     * @throws InvalidCommandMetadataException If the attribute type or declaration is invalid,
-     *         repeated, or cannot be materialized.
+     * @throws ExceptionInterface If the attribute type or declaration is invalid,
+     *                            repeated, or cannot be materialized.
+     * @throws \Throwable Other failures during metadata retrieval.
      */
     public function get(object|string $command, string $attribute): ?object;
 }

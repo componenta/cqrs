@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Locator;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Event\CommandListenerInterface;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
-use Componenta\CQRS\Command\Exception\InvalidListenerException;
-use Psr\Container\ContainerExceptionInterface;
 use Throwable;
 
 /** Locates listeners applicable to a command lifecycle event. */
@@ -24,9 +23,8 @@ interface CommandListenersLocatorInterface
      * only when calling this method. No listener is executed by the locator.
      *
      * @return iterable<CommandListenerInterface>
-     * @throws InvalidListenerException If a mapped service violates the listener contract.
-     * @throws ContainerExceptionInterface If a listener service cannot be resolved.
-     * @throws Throwable Other failures from name or service resolution.
+     * @throws ExceptionInterface If a registered listener violates the listener contract.
+     * @throws Throwable Other failures during lookup or iteration.
      */
     public function locateFor(CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event): iterable;
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
-use InvalidArgumentException;
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Throwable;
 
 /** Creates command operations before processing begins. */
@@ -16,7 +16,7 @@ interface OperationFactoryInterface
      * createdAt records local creation time, not handler start time.
      *
      * @param array<string, mixed> $attributes
-     * @throws InvalidArgumentException If attribute names violate OperationInterface.
+     * @throws ExceptionInterface If attribute names violate OperationInterface.
      * @throws Throwable Other failures during operation creation.
      */
     public function create(object $command, array $attributes = []): OperationInterface;
