@@ -8,6 +8,7 @@ use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationResult;
 use Componenta\CQRS\Tests\Fixture\DecoratedOperation;
 use Componenta\DI\CallableInvokerInterface;
+use Psr\Clock\ClockInterface;
 
 it('rejects any completed operation before locating or executing its handler', function (bool $decorated, mixed $value): void {
     $locator = new class implements CommandHandlerLocatorInterface {
@@ -31,10 +32,20 @@ it('rejects any completed operation before locating or executing its handler', f
         $operation = new DecoratedOperation($operation);
     }
 
-    expect(fn () => (new HandleCommandHandler($locator, $invoker))->handle($operation))
-        ->toThrow(RuntimeException::class, 'Operation already has result')
+    $clock = new class implements ClockInterface {
+        public int $calls = 0;
+        public function now(): DateTimeImmutable
+        {
+            ++$this->calls;
+            throw new LogicException('Completed operation must not read the clock.');
+        }
+    };
+
+    expect(fn () => (new HandleCommandHandler($locator, $invoker, $clock))->handle($operation))
+        ->toThrow(\Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException::class, 'Operation already has result')
         ->and($locator->calls)->toBe(0)
-        ->and($invoker->calls)->toBe(0);
+        ->and($invoker->calls)->toBe(0)
+        ->and($clock->calls)->toBe(0);
 })->with([
     'built-in operation, null result value' => [false, null],
     'built-in operation, non-null result value' => [false, 'done'],

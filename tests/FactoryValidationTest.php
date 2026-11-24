@@ -3,15 +3,29 @@
 declare(strict_types=1);
 
 use Componenta\Config\Config;
+use Componenta\Config\ContainerValue;
+use Componenta\Config\Environment;
 use Componenta\CQRS\Command\Factory\CommandBusFactory;
+use Componenta\CQRS\Command\Factory\EventMiddlewareFactory;
+use Componenta\CQRS\Command\Factory\OperationFactoryFactory;
 use Componenta\CQRS\Command\Factory\HandleCommandHandlerFactory;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
+use Componenta\CQRS\Command\Locator\CommandListenersLocatorInterface;
+use Componenta\CQRS\Command\Event\CommandProcessEvent;
+use Componenta\CQRS\Command\Event\CommandProcessedEvent;
+use Componenta\CQRS\Command\Event\CommandFailedEvent;
 use Componenta\CQRS\Command\Middleware\HandleCommandHandler;
 use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
+use Componenta\CQRS\Exception\InvalidConfigurationException;
+use Componenta\Identity\UuidFactory;
+use Componenta\Identity\UuidFactoryInterface;
+use Componenta\Identity\UuidGenerationVersion;
+use Psr\Clock\ClockInterface;
+use Psr\Container\ContainerInterface;
 use Componenta\CQRS\Query\Factory\HandleQueryFactory;
 use Componenta\CQRS\Query\Factory\QueryBusFactory;
 use Componenta\CQRS\Query\HandleQuery;
@@ -156,3 +170,71 @@ it('rejects invalid registered optional clock or UUID factory rather than silent
     [\Componenta\Identity\UuidFactoryInterface::class, null],
     [\Componenta\Identity\UuidFactoryInterface::class, new stdClass()],
 ]);
+
+it('honors the clock and UUID binding in the command bus factory standalone fallback', function (): void {
+    $time = new DateTimeImmutable('2025-01-01T10:00:00.123456+09:00');
+    $clock = new class ($time) implements ClockInterface {
+        public function __construct(private readonly DateTimeImmutable $time) {}
+        public function now(): DateTimeImmutable { return $this->time; }
+    };
+    $container = new FakeContainer([
+        Config::class => new Config([], new Environment([])),
+        HandleCommandHandler::class => commandHandlerForFactoryTests(),
+        ClockInterface::class => $clock,
+        UuidFactoryInterface::class => new UuidFactory(UuidGenerationVersion::V4),
+    ]);
+
+    $operation = (new CommandBusFactory())($container)->dispatch(new stdClass());
+
+    expect($operation->createdAt)->toBe($time)
+        ->and($operation->id->version)->toBe(4);
+});
+
+it('rejects invalid clock bindings in the handler and event middleware factories', function (mixed $invalid): void {
+    $locator = new class implements CommandHandlerLocatorInterface {
+        public function locateFor(object $command): callable { return static fn (): null => null; }
+    };
+    $listeners = new class implements CommandListenersLocatorInterface {
+        public function locateFor(CommandProcessEvent|CommandProcessedEvent|CommandFailedEvent $event): iterable
+        {
+            return [];
+        }
+    };
+    $config = new Config([], new Environment([]));
+    $container = new FakeContainer([
+        CommandHandlerLocatorInterface::class => $locator,
+        CommandListenersLocatorInterface::class => $listeners,
+        CallableInvokerInterface::class => new CallableInvoker(),
+        ClockInterface::class => $invalid,
+    ]);
+
+    expect(fn () => (new HandleCommandHandlerFactory())($container))
+        ->toThrow(InvalidConfigurationException::class, ClockInterface::class)
+        ->and(fn () => (new EventMiddlewareFactory())(new ContainerValue($container, $config)))
+        ->toThrow(InvalidConfigurationException::class, ClockInterface::class);
+})->with([null, new stdClass()]);
+
+it('does not replace errors from the container with UTC defaults', function (bool $failOnHas): void {
+    $failure = new RuntimeException('clock service failure');
+    $container = new class ($failure, $failOnHas) implements ContainerInterface {
+        public function __construct(private readonly Throwable $failure, private readonly bool $failOnHas) {}
+        public function has(string $id): bool
+        {
+            if ($id === ClockInterface::class && $this->failOnHas) {
+                throw $this->failure;
+            }
+            return $id === ClockInterface::class;
+        }
+        public function get(string $id): mixed
+        {
+            throw $this->failure;
+        }
+    };
+
+    try {
+        (new OperationFactoryFactory())($container);
+        test()->fail('Expected original container failure.');
+    } catch (RuntimeException $caught) {
+        expect($caught)->toBe($failure);
+    }
+})->with([true, false]);

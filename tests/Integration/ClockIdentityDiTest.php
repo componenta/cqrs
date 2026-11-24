@@ -11,6 +11,8 @@ use Componenta\CQRS\Command\Event\CommandListenerInterface;
 use Componenta\CQRS\Command\Event\CommandProcessedEvent;
 use Componenta\CQRS\Command\Event\CommandProcessEvent;
 use Componenta\CQRS\Command\Middleware\EventMiddleware;
+use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationFactoryInterface;
 use Componenta\CQRS\ConfigKey;
@@ -96,4 +98,51 @@ it('injects configured PSR-20 clock and Identity generator into the real DI comp
         ->and($listener->events[2]->propagationStoppedAt)->toBe($next)
         ->and($second->id->equals($first->id))->toBeFalse()
         ->and($clock->calls)->toBe(10);
+});
+
+it('allows application configuration to retarget the operation factory alias without replacing its public contract', function (): void {
+    $time = new DateTimeImmutable('2025-02-03T10:00:00+09:00');
+    $custom = new readonly class ($time) implements OperationFactoryInterface {
+        public function __construct(private DateTimeImmutable $time) {}
+        public function create(object $command, array $attributes = []): OperationInterface
+        {
+            return Operation::create(
+                $command,
+                [...$attributes, 'factory' => 'custom'],
+                $this->time,
+            );
+        }
+    };
+    $provider = new class ($custom) extends BaseProvider {
+        public function __construct(private readonly OperationFactoryInterface $custom) {}
+        protected function getAliases(): array
+        {
+            return [OperationFactoryInterface::class => 'custom.operation.factory'];
+        }
+        protected function getServices(): array
+        {
+            return [
+                'custom.operation.factory' => $this->custom,
+                'custom.command.handler' => static fn (stdClass $command): int => 42,
+            ];
+        }
+        protected function getConfig(): array
+        {
+            return [
+                ConfigKey::COMMAND_HANDLERS => [
+                    ['message' => stdClass::class, 'service' => 'custom.command.handler', 'method' => '__invoke'],
+                ],
+            ];
+        }
+    };
+    $composition = (new ConfigFactory())->create(new Environment([]), new ConfigProvider(), $provider);
+    $container = (new ContainerFactory())->create($composition->config, $composition->dependencies)->container;
+
+    expect($container->get(OperationFactoryInterface::class))->toBe($custom)
+        ->and($container->get(OperationFactory::class))->toBeInstanceOf(OperationFactory::class);
+
+    $operation = $container->get(CommandBusInterface::class)->dispatch(new stdClass(), ['trace' => 1]);
+    expect($operation->createdAt)->toBe($time)
+        ->and($operation->attributes)->toBe(['trace' => 1, 'factory' => 'custom'])
+        ->and($operation->result?->value)->toBe(42);
 });

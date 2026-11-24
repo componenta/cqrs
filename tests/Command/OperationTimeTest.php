@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Componenta\CQRS\Command\CommandBus;
+use Componenta\CQRS\Command\Middleware\OperationHandlerInterface;
+use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationFactory;
 use Componenta\CQRS\Command\OperationResult;
@@ -102,4 +105,32 @@ it('does not generate an identifier after a clock failure', function (): void {
         expect($caught)->toBe($failure);
     }
     expect($generator->calls)->toBe(0);
+});
+
+it('does not enter the command pipeline when the configured UUID generator fails', function (): void {
+    $failure = new RuntimeException('UUID source failure');
+    $generator = new class ($failure) implements UuidFactoryInterface {
+        public int $calls = 0;
+        public function __construct(private readonly Throwable $failure) {}
+        public function generate(): UuidInterface { ++$this->calls; throw $this->failure; }
+        public function fromBytes(string $bytes): RfcUuidInterface { throw new LogicException('Unexpected conversion'); }
+    };
+    $handler = new class implements OperationHandlerInterface {
+        public int $calls = 0;
+        public function handle(OperationInterface $operation): OperationInterface
+        {
+            ++$this->calls;
+            return $operation;
+        }
+    };
+    $bus = new CommandBus($handler, operationFactory: new OperationFactory(uuidFactory: $generator));
+
+    try {
+        $bus->dispatch(new stdClass());
+        test()->fail('Expected original generator failure.');
+    } catch (RuntimeException $caught) {
+        expect($caught)->toBe($failure);
+    }
+
+    expect($generator->calls)->toBe(1)->and($handler->calls)->toBe(0);
 });
