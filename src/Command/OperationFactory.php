@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
+
 /**
  * Default operation factory used by CommandBus.
  *
@@ -21,7 +23,7 @@ final readonly class OperationFactory implements OperationFactoryInterface
      * @param object $command
      * @param array<string, mixed> $attributes
      * @return OperationInterface New operation instance
-     * @throws \InvalidArgumentException If an attribute name is invalid.
+     * @throws ExceptionInterface If an attribute name is invalid.
      */
     public function create(object $command, array $attributes = []): OperationInterface
     {

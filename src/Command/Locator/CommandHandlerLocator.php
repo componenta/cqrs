@@ -31,12 +31,7 @@ final class CommandHandlerLocator implements CommandHandlerLocatorInterface, Com
         $this->resolver = $resolver;
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws HandlerNotFoundException
-     * @throws InvalidHandlerException
-     */
+    /** @inheritDoc */
     public function locateFor(object $command): callable
     {
         $commandName = $this->resolveCommandName($command);

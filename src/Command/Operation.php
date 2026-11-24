@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command;
 
+use Componenta\CQRS\Exception\ExceptionInterface;
 use Componenta\CQRS\Command\Exception\OperationAlreadyCompletedException;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -18,7 +19,7 @@ final readonly class Operation implements OperationInterface
 
     /**
      * @param array<string, mixed> $attributes
-     * @throws InvalidArgumentException If an attribute name is invalid.
+     * @throws ExceptionInterface If an attribute name is invalid.
      */
     public function __construct(
         public UuidInterface $id,
@@ -42,7 +43,7 @@ final readonly class Operation implements OperationInterface
 
     /**
      * @param array<string, mixed> $attributes
-     * @throws InvalidArgumentException If an attribute name is invalid.
+     * @throws ExceptionInterface If an attribute name is invalid.
      */
     public static function create(object $command, array $attributes = []): self
     {

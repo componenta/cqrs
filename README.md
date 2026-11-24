@@ -176,7 +176,7 @@ The default array locators use an injected name resolver only when it supports t
 
 ## Failure contracts
 
-The command and query buses propagate failures from the relevant processing stage without wrapping them. Handler lookup failures apply only if processing reaches the terminal handler:
+The command and query buses propagate failures from the relevant processing stage without wrapping them. The package-wide `Componenta\CQRS\Exception\ExceptionInterface` extends `Throwable` and marks all CQRS-owned exceptions. Public contracts expose this interface for CQRS failures and `Throwable` for other failures, independently of the configured container and invoker. Concrete CQRS exceptions remain available for more specific handling and retain their SPL parent types. External exceptions are not made CQRS exceptions merely because they propagate through a bus. Handler lookup failures apply only if processing reaches the terminal handler:
 
 | Situation | Exception |
 | --- | --- |
@@ -184,9 +184,11 @@ The command and query buses propagate failures from the relevant processing stag
 | No matching query registration | `Query\Exception\HandlerNotFoundException` |
 | Mapped command service does not satisfy the callable descriptor | `Command\Exception\InvalidHandlerException` |
 | Mapped query service does not satisfy the callable descriptor | `Query\Exception\InvalidHandlerException` |
-| Invalid operation attributes or array query context | `InvalidArgumentException` |
-| Mapped service missing from the container or failing to initialize | Original PSR-11 container exception |
-| Callable preparation or argument resolution fails | Original invoker exception (`Componenta\DI\Exception\ExceptionInterface` for DI-owned failures) |
+| Invalid operation attributes or array query context | `Exception\InvalidArgumentException` |
+| Invalid CQRS configuration | `Exception\InvalidConfigurationException` |
+| Reusing a completed operation | `Command\Exception\OperationAlreadyCompletedException` |
+| Mapped service missing or failing to initialize | Original external `Throwable` |
+| Callable preparation or argument resolution fails | Original external `Throwable` |
 | Handler or middleware throws | Original escaping throwable |
 
 CQRS exception names in this table are relative to `Componenta\CQRS`. `HandlerNotFoundException` carries the resolved logical message name; an absent DI service for an existing registration is a container failure, not a missing-handler registration.

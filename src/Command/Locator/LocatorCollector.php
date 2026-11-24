@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Locator;
 
-use Componenta\CQRS\Command\Exception\HandlerNotFoundException;
-
 /**
  * Composite locator delegating to first supporting locator.
  *
@@ -42,11 +40,7 @@ final readonly class LocatorCollector implements CommandHandlerLocatorInterface
         $this->locators = $locators;
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws HandlerNotFoundException if handler for command not found
-     */
+    /** @inheritDoc */
     public function locateFor(object $command): callable
     {
         foreach ($this->locators as $locator) {
