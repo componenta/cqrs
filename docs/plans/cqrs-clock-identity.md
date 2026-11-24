@@ -1,9 +1,9 @@
 # CQRS 5: интеграция PSR-20 и миграция на Componenta Identity
 
-**Статус:** спецификация до реализации; предлагаемые решения требуют утверждения.  
+**Статус:** реализация согласованных контрактов и интеграции; приёмка выпуска не завершена.  
 **Дата:** 2026-11-24.  
 **Исходная ревизия:** 35de3ba509292281150414f40e595712432b749f.  
-**Проверенные зависимости:** DI 6 (2361c398fc938108de67df8ec6a723bf4c4648ff), Identity v1.0.1 (2e843b1d828447f9ee8ba8f7749c68c23198b402), Clock v1.1.0 (a97b782bd17e413864ba24d90d86b75297b7b99d).
+**Проверенные зависимости:** DI 6 (2361c398fc938108de67df8ec6a723bf4c4648ff), Identity v1.1.0 (e036d5d787379b69cf85d8c3ae83db732590b676), Clock v1.1.0 (a97b782bd17e413864ba24d90d86b75297b7b99d).
 
 ## 1. Цель и обязательные требования
 
@@ -16,11 +16,11 @@
 - Сохранить порядок событий, правила обработки исключений, shallow immutability, проверку ключей атрибутов и семантику null-результата. Не изменять retry/transaction семантику.
 - Не вводить глобальные часы, сеттеры зависимостей, новые публичные интерфейсы, фабрики результатов или событий без необходимости. Не менять Identity, Clock, DI 6 и интеграционные пакеты в рамках данного плана.
 
-## 2. Предлагаемые решения, требующие утверждения
+## 2. Согласованные решения
 
 1. Конструкторное внедрение optional ClockInterface вместо ClockAwareInterface/setClock(). Сохраняется readonly компонентов.
 2. Operation::create принимает дополнительный готовый UUID, чтобы OperationFactory могла использовать UuidFactoryInterface без хранения генератора внутри операции.
-3. CommandEvent::stop принимает необязательную готовую отметку. Событие не хранит часы. Вызов без аргумента использует системное UTC, даже если middleware настроен на пользовательские часы. Автоматический clock для stop() требует отдельного решения (§ 5.3).
+3. CommandEvent получает опциональные приватные readonly часы от EventMiddleware и самостоятельно фиксирует dispatchedAt при создании, а propagationStoppedAt при первом успешном вызове stop(). Метод stop() не принимает временную отметку. Без часов используется системное время UTC.
 4. Стандартный генератор — UUID v7; явно настроенный UuidFactoryInterface определяет версию сам. Тип id — минимальный Componenta\Identity\UuidInterface.
 5. UUID v7 и createdAt не обязаны иметь одинаковую временную составляющую: текущий Identity использует собственный источник времени и не принимает timestamp в generate()/v7(). Не менять алгоритм генерации ради их синхронизации.
 6. Для прямого Operation::create без id — повторно используемый приватный генератор по умолчанию; для штатной диспетчеризации — внедрённый или собственный генератор OperationFactory. Не создавать фабрику UUID на каждом dispatch.
@@ -35,8 +35,8 @@
 | Operation::create | Ramsey Uuid::uuid7() | Готовый UUID или Identity v7 |
 | Operation::create | now UTC | Готовый createdAt или now UTC |
 | OperationResult::__construct | Готовый processedAt или now UTC | Без изменения алгоритма |
-| CommandEvent::__construct | now UTC | Готовый dispatchedAt или now UTC |
-| CommandEvent::stop | Первое время остановки UTC | Готовый stoppedAt или now UTC |
+| CommandEvent::__construct | now UTC | clock->now() или now UTC |
+| CommandEvent::stop | Первое время остановки UTC | clock->now() или now UTC при первом успешном stop() |
 
 Часы нужны OperationFactory, HandleCommandHandler, EventMiddleware. В QueryBus, Context, PipelineHandler, BatchCommandBus, локаторы и резолверы не внедрять: они не получают время самостоятельно.
 
@@ -49,7 +49,7 @@
         "php-64bit": "*",
         "componenta/config": "^3.0.0",
         "componenta/di": "^6.0",
-        "componenta/identity": "^1.0.1",
+        "componenta/identity": "^1.1.0",
         "componenta/reflection": "^2.0.1",
         "psr/clock": "^1.0",
         "psr/container": "^2.0"
@@ -95,8 +95,8 @@ public static function create(
     ?UuidInterface $id = null,
 ): self {
     if ($id === null) {
-        static $defaultUuidFactory = null;
-        $id = ($defaultUuidFactory ??= new UuidFactory())->generate();
+        static $defaultUuidFactory = new UuidFactory();
+        $id = $defaultUuidFactory->generate();
     }
 
     return new self(
@@ -139,7 +139,8 @@ final readonly class OperationFactory
         return Operation::create(
             command: $command,
             attributes: $attributes,
-            createdAt: $this->clock?->now(),
+            createdAt: $this->clock?->now()
+                ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
             id: $this->uuidFactory->generate(),
         );
     }
@@ -193,44 +194,48 @@ return $operation->withResult(
 
 ### 5.2. CommandEvent и CommandFailedEvent
 
+Событие само фиксирует момент своего создания через переданный ClockInterface либо системное UTC. Отметку извне не принимает.
+
 ~~~php
 // CommandEvent
 public function __construct(
     public readonly OperationInterface $operation,
-    ?DateTimeImmutable $dispatchedAt = null,
+    private readonly ?ClockInterface $clock = null,
 ) {
-    $this->dispatchedAt = $dispatchedAt
+    $this->dispatchedAt = $this->now();
+}
+
+private function now(): DateTimeImmutable
+{
+    return $this->clock?->now()
         ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
 }
 ~~~
 
-CommandProcessEvent и CommandProcessedEvent наследуют конструктор. В CommandFailedEvent расширить существующий конструктор:
+CommandProcessEvent и CommandProcessedEvent наследуют конструктор. CommandFailedEvent сохраняет порядок существующих аргументов:
 
 ~~~php
 public function __construct(
     OperationInterface $operation,
     public readonly Throwable $exception,
-    ?DateTimeImmutable $dispatchedAt = null,
+    ?ClockInterface $clock = null,
 ) {
-    parent::__construct($operation, $dispatchedAt);
+    parent::__construct($operation, $clock);
 }
 ~~~
 
-Сохранить идентичность exception, operation и переданной даты. Не подменять время события временем операции.
+Сохранить идентичность exception, operation и возвращаемой часами даты. Не подменять время события временем операции.
 
 ### 5.3. Остановка распространения
 
 ~~~php
-public function stop(?DateTimeImmutable $stoppedAt = null): void
+public function stop(): void
 {
-    $this->propagationStoppedAt ??= $stoppedAt
-        ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $this->propagationStoppedAt ??= $this->now();
 }
 ~~~
 
-Первая остановка устанавливает время; последующие ничего не меняют, даже при ином аргументе. Сохраняются isPropagationStopped и прежнее значение свойства. Событие не отменяет исполнение команды. Слушатель, использующий пользовательские часы, передаёт дату явно: $event->stop($clock->now()).
-
-**Граница выбранного варианта:** stop() без аргумента не использует часы middleware. Остановка происходит позднее создания события, поэтому передать её время заранее невозможно. Если требуется, чтобы и такой вызов использовал те же внедрённые часы, альтернативой будет приватная readonly зависимость от ClockInterface в CommandEvent только для stop(). В базовую спецификацию она не включена. Не переносить фиксацию времени остановки на конец middleware и не заменять её dispatchedAt.
+Первый успешный stop() получает отметку в момент вызова; последующие вызовы не читают часы и не меняют состояние. Слушатель не передаёт произвольную дату. При ошибке часов отметка остаётся null; ошибка распространяется вызывающему коду. Если ошибка возникла внутри слушателя, действуют существующие правила подавления ошибок слушателей. Событие не отменяет выполнение команды. Часы хранятся только в приватном readonly свойстве события и не являются его публичным состоянием.
 
 ### 5.4. EventMiddleware
 
@@ -242,30 +247,20 @@ public function __construct(
 ) {}
 ~~~
 
-В каждой существующей ветви execute передавать готовое время:
+В каждой существующей ветви execute передаётся одна и та же ссылка на опциональные часы:
 
 ~~~php
 // До downstream.
-$this->dispatch(new CommandProcessEvent(
-    $operation,
-    dispatchedAt: $this->clock?->now(),
-));
+$this->dispatch(new CommandProcessEvent($operation, $this->clock));
 
 // В существующей ветви catch downstream failure.
-$this->dispatch(new CommandFailedEvent(
-    $operation,
-    $exception,
-    dispatchedAt: $this->clock?->now(),
-));
+$this->dispatch(new CommandFailedEvent($operation, $exception, $this->clock));
 
 // После успешного возврата downstream.
-$this->dispatch(new CommandProcessedEvent(
-    $operation,
-    dispatchedAt: $this->clock?->now(),
-));
+$this->dispatch(new CommandProcessedEvent($operation, $this->clock));
 ~~~
 
-Это отдельные фрагменты существующего алгоритма, не последовательность из трёх событий. Failed и Processed взаимоисключающие. Не менять try/catch и фильтрацию слушателей. Не получать все даты до выполнения обработчика. Processed означает успешный возврат downstream, не гарантирует наличия result при отложенной обработке.
+Failed и Processed взаимоисключающие. Порядок и границы try/catch сохраняются. Время не читается заранее; stop() использует тот же источник времени. Processed означает успешный возврат downstream, не гарантирует наличия result при отложенной обработке.
 
 ## 6. DI 6
 
@@ -426,16 +421,16 @@ OperationResult.php — только документация при необх�
 | T03 | Handler возвращает null | OperationResult существует, value null |
 | T04 | Завершённая операция | OperationAlreadyCompletedException до locator/invoker/clock |
 | T05 | Handler бросает Throwable | Исходная ошибка, часы результата не вызваны |
-| T06 | Все три события с явной датой / без | Исходная дата / UTC fallback; Failed сохраняет exception |
-| T07 | Первый stop с датой / без | Timestamp и isPropagationStopped; дальнейшие слушатели пропущены |
-| T08 | Повторный stop с другой датой | Первое время неизменно |
+| T06 | Все три события с часами / без | Дата из clock без изменений / UTC fallback; Failed сохраняет exception |
+| T07 | Первый stop с часами / без | Timestamp и isPropagationStopped; дальнейшие слушатели пропущены |
+| T08 | Повторный stop() после успешной остановки | Первое время неизменно; часы не читаются повторно |
 | T09 | Полный успешный цикл | Отдельные отметки createdAt, Process, processedAt, Processed |
 | T10 | Downstream failure | Process и Failed, нет Processed; Failed после сбоя |
 | T11 | Clock выдаёт разные timezone или время назад | Нет нормализации, принудительной сортировки и округления |
 | T12 | now падает на Process/Result/Failed/Processed | Все границы исключений из § 7, двойная причина сохранена |
 | T13 | Suppression слушателей | Не подавляются ошибки создания событий |
 | T14 | Отложенная команда | Прежнее значение result и порядок событий |
-| T15 | stop() при настроенном clock middleware | UTC fallback выбранного варианта; stop($clock->now()) сохраняет дату часов |
+| T15 | stop() при настроенных часах middleware | Тот же источник времени, читаемый непосредственно в stop(); ошибка часов не изменяет состояние остановки |
 
 Использовать управляемые sequence clocks с публичным счётчиком, точные значения и идентичность. Для fallback проверять интервал до/после, не sleep и не точное совпадение двух вызовов системных часов. Не требовать UUID timestamp = createdAt.
 
@@ -461,7 +456,7 @@ D03 — интеграционный сценарий с реальными ве
 
 - Baseline — указанная исходная ревизия с Ramsey, candidate — Identity, одинаковые версии PHP и DI 6.
 - Текущий CI сравнивает подменой src при одном vendor. После смены типа UUID это некорректно: старый src требует Ramsey, новые fixtures используют Identity. Для миграции нужны две изолированные рабочие директории со своими Composer dependencies и эквивалентными fixtures на одном runner. Не возвращать Ramsey в производственные зависимости ради сравнения.
-- Сохранить существующие 86 сценариев PHPBench и проверку полноты отчёта. Добавить сценарии create default/explicit timestamp+id, OperationFactory без/с clock, reusable/fresh Identity generator, реальный dispatch с событиями/без, stop с датой/без.
+- Сохранить существующие 86 сценариев PHPBench и проверку полноты отчёта. Добавить сценарии create default/explicit timestamp+id, OperationFactory без/с clock, reusable/fresh Identity generator, реальный dispatch с событиями/без, stop с часами/без.
 - Сравнить время создания/завершения операции, runtime dispatch, стоимость сборки контейнера, пиковую память. Фиксировать PHP, OPcache/JIT, число итераций, warmup и разброс.
 - Повторяемое ухудшение горячего сценария более 5% — предлагаемый порог исследования и обоснования, а не заранее установленная гарантия прироста. Не трактовать шум как выигрыш/регрессию.
 - Не кешировать timestamp или UUID операции; не обходить invoker, проверки входа или контракт immutable-копий ради скорости.
@@ -481,11 +476,11 @@ D03 — интеграционный сценарий с реальными ве
 ## 12. Проверенные источники
 
 - [CQRS — исходная ревизия](https://github.com/componenta/cqrs/tree/35de3ba509292281150414f40e595712432b749f)
-- [Identity v1.0.1](https://github.com/componenta/identity/releases/tag/v1.0.1) — минимальный UuidInterface, UuidFactoryInterface и стандартный генератор
+- [Identity v1.1.0](https://github.com/componenta/identity/releases/tag/v1.1.0) — минимальный UuidInterface, UuidFactoryInterface и стандартный генератор
 - [Componenta UUID — Ramsey compatibility](https://github.com/componenta/uuid/blob/c545bb0e59ffde999e3ac25f318735cc5c203aba/README.md)
 - [Clock v1.1.0](https://github.com/componenta/clock/releases/tag/v1.1.0)
 - [PSR-20](https://www.php-fig.org/psr/psr-20/)
 - [DI 6 — InvokableResolver](https://github.com/componenta/di/blob/2361c398fc938108de67df8ec6a723bf4c4648ff/src/Resolver/Entry/InvokableResolver.php)
 - [Текущий workflow CQRS](https://github.com/componenta/cqrs/blob/35de3ba509292281150414f40e595712432b749f/.github/workflows/release.yml)
 
-Спецификация описывает целевое поведение. Код и зависимости пока не изменены; тесты и замеры нового функционала не выполнялись.
+Контракты создания операций, результатов и событий и их DI-регистрация реализованы. Окончательная приёмка, изолированные сравнительные бенчмарки и проверка внешних CQRS-пакетов остаются обязательными перед релизом.

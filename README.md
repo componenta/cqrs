@@ -21,7 +21,7 @@ An operation contains:
 
 - UUID v7 `id`;
 - the `command` instance;
-- `createdAt`, the UTC timestamp when this local operation object was created for dispatch;
+- `createdAt`, the timestamp when the operation was created for dispatch (UTC by default);
 - `attributes` with a strict `array<string,mixed>` contract;
 - optional `OperationResult`, whose `processedAt` records synchronous completion.
 
@@ -43,6 +43,29 @@ $bus = new Componenta\CQRS\Command\CommandBus(
 ```
 
 The operation factory is optional; `OperationFactory` is used by default.
+
+### Clock and UUID configuration
+
+The built-in operation factory accepts optional PSR-20 `ClockInterface` and an Identity `UuidFactoryInterface`. When no clock is configured, timestamps use current UTC time; the default generator produces UUIDv7.
+
+```php
+use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\Command\OperationFactory;
+use Componenta\Identity\UuidFactory;
+
+$factory = new OperationFactory(clock: $clock, uuidFactory: new UuidFactory());
+$operation = $factory->create($command);
+
+// Supply already computed values directly when needed:
+$operation = Operation::create(
+    command: $command,
+    createdAt: $clock->now(),
+);
+```
+
+`Operation::create()` receives a ready `DateTimeImmutable` and optional Identity UUID; without either value it uses current UTC and UUIDv7. The operation and its immutable copies preserve the supplied objects, timezone and microseconds. Use the minimal `Componenta\Identity\UuidInterface` for operation identifiers. Ramsey UUID objects are no longer accepted by this contract.
+
+With the CQRS config provider, registered `Psr\Clock\ClockInterface` and `Componenta\Identity\UuidFactoryInterface` services are used automatically. The handler reads the clock after a successful invocation; lifecycle events read it at construction and again only on the first successful `stop()`. A configured clock's timezone is preserved. Without a clock every stage falls back to current UTC. Clock failures propagate under the existing command and listener exception rules. No timestamp normalization or monotonic wall-clock guarantee is imposed.
 
 ### Multiple commands
 

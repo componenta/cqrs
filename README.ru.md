@@ -21,7 +21,7 @@ Operation содержит:
 
 - UUID v7 `id`;
 - экземпляр `command`;
-- `createdAt` — UTC-время создания локального объекта operation для dispatch;
+- `createdAt` — время создания операции для отправки на обработку (по умолчанию UTC);
 - `attributes` со строгим контрактом `array<string,mixed>`;
 - необязательный `OperationResult`, где `processedAt` фиксирует синхронное завершение.
 
@@ -42,7 +42,30 @@ $bus = new Componenta\CQRS\Command\CommandBus(
 );
 ```
 
-Если factory не передан, используется `OperationFactory`.
+Если фабрика не передана, используется `OperationFactory`.
+
+### Настройка часов и UUID
+
+Стандартная фабрика операций принимает необязательные часы PSR-20 (`ClockInterface`) и генератор Identity (`UuidFactoryInterface`). Без часов используется текущее время UTC, по умолчанию генерируется UUIDv7.
+
+```php
+use Componenta\CQRS\Command\Operation;
+use Componenta\CQRS\Command\OperationFactory;
+use Componenta\Identity\UuidFactory;
+
+$factory = new OperationFactory(clock: $clock, uuidFactory: new UuidFactory());
+$operation = $factory->create($command);
+
+// При необходимости передаются уже полученные значения:
+$operation = Operation::create(
+    command: $command,
+    createdAt: $clock->now(),
+);
+```
+
+`Operation::create()` принимает готовый `DateTimeImmutable` и необязательный UUID Identity; при отсутствии соответствующего значения используются текущее время UTC и UUIDv7. Операция и её неизменяемые копии сохраняют переданные объекты, часовой пояс и микросекунды. Для идентификатора операции используется минимальный `Componenta\Identity\UuidInterface`. Объекты Ramsey UUID больше не удовлетворяют этому контракту.
+
+При использовании провайдера конфигурации CQRS зарегистрированные `Psr\Clock\ClockInterface` и `Componenta\Identity\UuidFactoryInterface` внедряются автоматически. Обработчик получает время после успешного вызова, события — при создании и при первом успешном `stop()`. Часовой пояс настроенных часов сохраняется. Без часов каждый этап использует текущее время UTC. Ошибки часов обрабатываются по действующим правилам исключений команд и слушателей. Нормализация отметок и гарантия монотонности системного времени не предусмотрены.
 
 ### Несколько команд
 
