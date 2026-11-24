@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Query;
 
-use Closure;
 use Componenta\CQRS\Query\Locator\QueryHandlerLocatorInterface;
+use Componenta\CQRS\Internal\LocatedHandlerInvoker;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
 
@@ -19,6 +19,6 @@ final readonly class HandleQuery
 
     public function __invoke(object $query): mixed
     {
-        return $this->invoker->call($this->locator->locateFor($query), [$query]);
+        return LocatedHandlerInvoker::invoke($this->invoker, $this->locator->locateFor($query), $query);
     }
 }

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Componenta\CQRS\Command\Middleware;
 
-use Closure;
 use Componenta\CQRS\Command\Locator\CommandHandlerLocatorInterface;
 use Componenta\CQRS\Command\Operation;
 use Componenta\CQRS\Command\OperationInterface;
 use Componenta\CQRS\Command\OperationResult;
+use Componenta\CQRS\Internal\LocatedHandlerInvoker;
 use Componenta\DI\CallableInvoker;
 use Componenta\DI\CallableInvokerInterface;
 
@@ -31,17 +31,8 @@ final readonly class HandleCommandHandler implements OperationHandlerInterface
 
         $handler = $this->locator->locateFor($operation->command);
 
-        // An invoker may treat a string as a container service ID. Preserve the
-        // chosen function target, while deferring static-method visibility
-        // checks to the invoker's own scope.
-        if (is_string($handler)) {
-            $handler = str_contains($handler, '::')
-                ? explode('::', $handler, 2)
-                : Closure::fromCallable($handler);
-        }
-
         return $operation->withResult(
-            new OperationResult($this->invoker->call($handler, [$operation->command])),
+            new OperationResult(LocatedHandlerInvoker::invoke($this->invoker, $handler, $operation->command)),
         );
     }
 }
