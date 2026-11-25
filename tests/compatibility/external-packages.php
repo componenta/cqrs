@@ -62,6 +62,26 @@ function command(array $arguments, string $directory, bool $allowFailure = false
     return $exit;
 }
 
+/**
+ * Pest 4 currently depends on ParaTest with a PHP < 8.6 upper bound.
+ * The PHP 8.6 lane is explicitly experimental and uses the non-parallel
+ * Pest runner. Never skip the actual production platform requirements
+ * or Composer security checks.
+ */
+function installTestGraph(string $directory, bool $withoutScripts = false): void
+{
+    $arguments = ['composer', 'update', '--with-all-dependencies', '--no-interaction', '--prefer-dist', '--no-progress'];
+    if ($withoutScripts) {
+        $arguments[] = '--no-scripts';
+    }
+    if (PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION === 6) {
+        echo "Experimental PHP 8.6 non-parallel test graph: relaxing PHP upper bounds for dependency resolution only.\n";
+        $arguments[] = '--ignore-platform-req=php+';
+    }
+    command($arguments, $directory);
+    command(['composer', 'check-platform-reqs', '--no-dev'], $directory);
+}
+
 function checkout(string $package, string $ref, string $directory): void
 {
     command(['git', 'init', '-q', $directory], dirname($directory));
@@ -151,7 +171,7 @@ function runApplicationIntegration(string $root, string $workspace, array $pins,
 
     $manifest['repositories'] = $repositories;
     writeManifest($target, $manifest);
-    command(['composer', 'update', '--with-all-dependencies', '--no-interaction', '--prefer-dist', '--no-progress', '--no-scripts'], $target);
+    installTestGraph($target, withoutScripts: true);
     command(['composer', 'test'], $target);
     command(['composer', 'audit', '--locked', '--no-dev', '--no-interaction'], $target);
     echo "Cross-package application integration passed.\n";
@@ -213,7 +233,7 @@ foreach ($selected as $dependency) {
 }
 writeManifest($target, $manifest);
 
-command(['composer', 'update', '--with-all-dependencies', '--no-interaction', '--prefer-dist', '--no-progress'], $target);
+installTestGraph($target);
 $lock = json_decode(file_get_contents($target . '/composer.lock'), true, flags: JSON_THROW_ON_ERROR);
 $locked = array_column(array_merge($lock['packages'], $lock['packages-dev']), 'version', 'name');
 foreach ($selected as $dependency) {
