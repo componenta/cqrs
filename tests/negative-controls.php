@@ -68,6 +68,10 @@ $controls = [
     ['operation attribute snapshot', 'src/Command/Operation.php', '$this->attributes = $snapshot;', '$this->attributes = $attributes;', 'tests/AttributeSnapshotTest.php', 'isolates operation attributes from caller references and returned array copies'],
     ['query context snapshot', 'src/Query/Context/Context.php', '$this->attributes = $snapshot;', '$this->attributes = $attributes;', 'tests/AttributeSnapshotTest.php', 'isolates context attributes from caller references and returned array copies'],
     ['registration conflict', 'src/Internal/RegistrationNormalizer.php', 'if (isset($handlers[$message]) && $handlers[$message] !== $handler)', 'if (false)', 'tests/AuditContractRegressionTest.php', 'rejects conflicting methods on the same registered handler service'],
+    ['metadata cache-hit behavior', 'src/Command/Metadata/ReflectionCommandMetadataProvider.php', 'return $cached?->newInstance();', 'return null;', 'tests/Command/Metadata/CommandMetadataProviderTest.php', 'keeps constructor failures observable even after successful metadata lookup'],
+    ['configured completion clock', 'src/Command/Middleware/HandleCommandHandler.php', 'processedAt: $this->clock->now()', 'processedAt: (new UtcClock())->now()', 'tests/Command/LifecycleClockTest.php', 'records lifecycle instants at each stage with the configured clock including first stop'],
+    ['batch prevalidation', 'src/Command/BatchCommandBus.php', 'self::assertAttributes($commandClass, $commandAttributes);', '// Skip prevalidation.', 'tests/Command/BatchCommandBusTest.php', 'rejects malformed selected attributes before dispatching any command'],
+    ['query middleware order', 'src/Query/QueryBus.php', 'self::compile($handler, array_values($middlewares))', 'self::compile($handler, array_reverse(array_values($middlewares)))', 'tests/Query/QueryBusTest.php', 'chains middlewares in registration order, onion-style'],
 ];
 
 try {

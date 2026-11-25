@@ -268,6 +268,7 @@ Message handler должен занимать первый parameter slot. CQRS 
 ```bash
 composer test
 composer analyse
+composer test:negative
 composer bench
 ```
 

@@ -134,3 +134,27 @@ it('does not enter the command pipeline when the configured UUID generator fails
 
     expect($generator->calls)->toBe(1)->and($handler->calls)->toBe(0);
 });
+
+it('generates distinct operation identifiers even when the application clock is frozen', function (): void {
+    $time = new DateTimeImmutable('2025-02-03 04:05:06.123456', new DateTimeZone('Asia/Tokyo'));
+    $clock = new readonly class ($time) implements ClockInterface {
+        public function __construct(private DateTimeImmutable $time) {}
+        public function now(): DateTimeImmutable { return $this->time; }
+    };
+    $factory = new OperationFactory($clock);
+    $identifiers = [];
+    $previous = null;
+
+    for ($index = 0; $index < 256; ++$index) {
+        $operation = $factory->create(new stdClass());
+        expect($operation->createdAt)->toBe($time)
+            ->and($operation->id)->toBeInstanceOf(ComparableUuidInterface::class);
+        if ($previous !== null) {
+            expect($previous->compareTo($operation->id))->toBe(ComparisonResult::Less);
+        }
+        $identifiers[] = $operation->id->toString();
+        $previous = $operation->id;
+    }
+
+    expect(array_unique($identifiers))->toHaveCount(256);
+});

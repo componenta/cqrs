@@ -192,3 +192,37 @@ it('preserves exact attribute-name matching across repeated lookups', function (
         ->and($provider->get(MetadataCommand::class, '\\' . MetadataWithObject::class))
         ->toBeInstanceOf(MetadataWithObject::class);
 });
+
+it('keeps metadata behavior unchanged after many distinct class lookups fill the bounded cache', function (): void {
+    $provider = new ReflectionCommandMetadataProvider();
+    $first = $provider->get(MetadataCommand::class, MetadataWithObject::class);
+    expect($first)->toBeInstanceOf(MetadataWithObject::class);
+    $first->payload->value = 'changed';
+
+    // More distinct class names than the cache budget. All refer to the same
+    // declaration, so the expected behavior remains independent of cache hits.
+    for ($index = 0; $index < 520; ++$index) {
+        $alias = 'CqrsMetadataCacheCapacityAlias' . $index;
+        class_alias(MetadataCommand::class, $alias);
+        $metadata = $provider->get($alias, MetadataWithObject::class);
+        expect($metadata)->toBeInstanceOf(MetadataWithObject::class)
+            ->and($metadata->payload->value)->toBe('initial');
+    }
+
+    $second = $provider->get(MetadataCommand::class, MetadataWithObject::class);
+    expect($second)->toBeInstanceOf(MetadataWithObject::class)
+        ->and($second)->not->toBe($first)
+        ->and($second->payload->value)->toBe('initial');
+    expect($provider->get(stdClass::class, MetadataWithObject::class))->toBeNull();
+
+    RetriedMetadata::$fail = true;
+    try {
+        expect(fn () => $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class))
+            ->toThrow(InvalidCommandMetadataException::class, 'temporary metadata failure');
+        RetriedMetadata::$fail = false;
+        $recovered = $provider->get(RetriedMetadataCommand::class, RetriedMetadata::class);
+        expect($recovered)->toBeInstanceOf(RetriedMetadata::class);
+    } finally {
+        RetriedMetadata::$fail = true;
+    }
+});

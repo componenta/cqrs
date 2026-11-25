@@ -268,6 +268,7 @@ Terminal handlers pass the callable returned by the locator and the message to t
 ```bash
 composer test
 composer analyse
+composer test:negative
 composer bench
 ```
 
