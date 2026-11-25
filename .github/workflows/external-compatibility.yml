@@ -22,6 +22,7 @@ jobs:
       matrix:
         package:
           - cqrs-app
+          - cqrs-app-integration
           - cqrs-policy
           - cqrs-retry
           - cqrs-lock

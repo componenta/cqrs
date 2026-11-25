@@ -30,7 +30,7 @@ $versions = [
     'cqrs-transport' => '5.0.x-dev',
 ];
 
-if (!array_key_exists($package, $extras) || $workspace === '' || !is_dir($workspace)) {
+if ((!array_key_exists($package, $extras) && $package !== 'cqrs-app-integration') || $workspace === '' || !is_dir($workspace)) {
     throw new InvalidArgumentException('Select one supported package and an existing scratch directory.');
 }
 $workspace = realpath($workspace);
@@ -86,6 +86,70 @@ function migrateRequirements(array $manifest): array
         }
     }
     return $manifest;
+}
+
+/**
+ * Reuse the maintained cross-package application suite, including its
+ * LocalPackagesTest. Every explicitly required Componenta package is checked
+ * out next to cqrs-app as required by the suite's public fixture contract.
+ */
+function runApplicationIntegration(string $root, string $workspace, array $pins, array $versions): void
+{
+    $app = $workspace . '/cqrs-app';
+    checkout('cqrs-app', $pins['cqrs-app'], $app);
+    $target = $app . '/integration';
+    $manifest = manifest($target);
+    $releaseVersions = $manifest['repositories'][0]['options']['versions'];
+    $repositories = [];
+
+    foreach ($manifest['require'] as $name => $constraint) {
+        if (!str_starts_with($name, 'componenta/')) {
+            continue;
+        }
+        $dependency = substr($name, strlen('componenta/'));
+        $directory = $workspace . '/' . $dependency;
+
+        if ($dependency === 'cqrs') {
+            if (!symlink($root, $directory)) {
+                throw new RuntimeException('Cannot link the candidate CQRS checkout.');
+            }
+            command(['git', 'rev-parse', 'HEAD'], $root);
+            $version = $versions[$dependency];
+        } else {
+            if ($dependency !== 'cqrs-app') {
+                checkout($dependency, $pins[$dependency] ?? 'v' . $releaseVersions[$name], $directory);
+            }
+
+            if (isset($pins[$dependency])) {
+                if ($dependency !== 'di') {
+                    writeManifest($directory, migrateRequirements(manifest($directory)));
+                }
+                // All modified/prospective packages have explicit dev versions.
+                $version = $versions[$dependency] ?? preg_replace('/\.[0-9]+$/', '.x-dev', $releaseVersions[$name]);
+            } else {
+                $version = $releaseVersions[$name];
+            }
+        }
+
+        $repositories[] = [
+            'type' => 'path',
+            'url' => $directory,
+            'options' => ['symlink' => true, 'versions' => [$name => $version]],
+        ];
+        $manifest['require'][$name] = $version;
+    }
+
+    $manifest['repositories'] = $repositories;
+    writeManifest($target, $manifest);
+    command(['composer', 'update', '--with-all-dependencies', '--no-interaction', '--prefer-dist', '--no-progress', '--no-scripts'], $target);
+    command(['composer', 'test'], $target);
+    command(['composer', 'audit', '--locked', '--no-dev', '--no-interaction'], $target);
+    echo "Cross-package application integration passed.\n";
+}
+
+if ($package === 'cqrs-app-integration') {
+    runApplicationIntegration($root, $workspace, $pins, $versions);
+    exit(0);
 }
 
 $target = $workspace . '/package';
