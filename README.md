@@ -67,7 +67,9 @@ $operation = Operation::create(
 
 `Operation::create()` receives a ready `DateTimeImmutable` and optional Identity UUID; without either value it uses current UTC and UUIDv7. The operation and its immutable copies preserve the supplied objects, timezone and microseconds. Use the minimal `Componenta\Identity\UuidInterface` for operation identifiers. Ramsey UUID objects are no longer accepted by this contract.
 
-With the CQRS config provider, registered `Psr\Clock\ClockInterface` and `Componenta\Identity\UuidFactoryInterface` services are used automatically. The handler reads the clock after a successful invocation; lifecycle events read it at construction and again only on the first successful `stop()`. A configured clock's timezone is preserved. When no clock service is registered, every stage uses `UtcClock`; an explicitly registered `null` or incorrectly typed clock is a configuration error. Clock failures propagate under the existing command and listener exception rules. No timestamp normalization or monotonic wall-clock guarantee is imposed.
+With the CQRS config provider, registered `Psr\Clock\ClockInterface` and `Componenta\Identity\UuidFactoryInterface` services are used automatically. The handler reads the clock after a successful invocation; lifecycle events read it at construction and again only on the first successful `stop()`. A configured clock's timezone is preserved. When no clock service is registered, every stage uses `UtcClock`; an explicitly registered `null` or incorrectly typed clock is a configuration error. Clock failures propagate under the existing command and listener exception rules. No timestamp normalization or monotonic wall-clock guarantee is imposed. If a custom clock fails after a handler has run, its side effects may already have occurred.
+
+To replace the operation factory through DI, retarget the `OperationFactoryInterface` alias in an application provider to the service ID of your custom factory. The standard concrete `OperationFactory` remains available. Do not register conflicting factory/service definitions for the same canonical DI identifier.
 
 ### Multiple commands
 
@@ -269,4 +271,4 @@ composer analyse
 composer bench
 ```
 
-CI runs Pest and PHPStan at maximum level on PHP 8.5 and an isolated production-consumer smoke test with minimum supported dependency versions on PHP 8.6. Development CI verifies a pinned DI 6 source snapshot; release CI installs the declared stable dependencies. The PHPBench suite separates construction, routing, attribute and metadata operations from real DI-backed dispatch.
+CI runs Pest and PHPStan at maximum level on PHP 8.5 and an isolated production-consumer smoke test with minimum supported dependency versions on PHP 8.6. Development CI verifies a pinned DI 6 source snapshot; release CI installs the declared stable dependencies. The PHPBench suite separates construction, routing, attribute and metadata operations from real DI-backed dispatch. It also measures operation and result creation, UUID generation, the UTC clock, and event creation with propagation stopping. Dependency changes require isolated baseline and candidate installations with matching common dependency versions. Composer audits the full development dependency set for security advisories and enforces a strict production dependency audit.

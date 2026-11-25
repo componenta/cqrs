@@ -4,13 +4,13 @@ Status: **Open / requires integration-level decision**. Updated 2026-11-22.
 
 ## Problem
 
-A synchronous command handler can complete successfully and be followed by a failing `CommandProcessedEvent` listener. If a retry wrapper surrounds `EventMiddleware` and treats all thrown exceptions as retryable, a new attempt may reexecute a handler with side effects. A completed built-in `Operation` guard prevents the direct *completed-object* reuse case, but does not protect a fresh retry of the still-uncompleted outer operation.
+A synchronous command handler can complete successfully and be followed by a failing `CommandProcessedEvent` listener. A configured clock can also fail while recording completion or constructing the processed event, after the handler has already run. If a retry wrapper surrounds `EventMiddleware` and treats all thrown exceptions as retryable, a new attempt may reexecute a handler with side effects. A completed built-in `Operation` guard prevents the direct *completed-object* reuse case, but does not protect a fresh retry of the still-uncompleted outer operation.
 
 ## Design alternatives
 
 ### A. Event → Retry → handler
 
-Lifecycle events describe one outer dispatch, not individual attempts. An exception from the processed listener is thrown outside the inner retry. Intermediate handler exceptions retried successfully are not externally emitted as `CommandFailedEvent`. Simple configuration solution if dispatch-level events are correct.
+Lifecycle events describe one outer dispatch, not individual attempts. An exception from the processed listener or construction of the processed event is thrown outside the inner retry. A clock error during result construction still occurs inside the terminal handler stage and may be retried by a surrounding retry middleware. Intermediate handler exceptions retried successfully are not externally emitted as `CommandFailedEvent`. Simple configuration solution if dispatch-level events are correct.
 
 ### B. Retry → Event → handler, with failure classification
 
