@@ -1,0 +1,68 @@
+name: External CQRS 5 compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'composer.json'
+      - 'tests/compatibility/**'
+      - '.github/workflows/external-compatibility.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Candidate (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - cqrs-app
+          - cqrs-policy
+          - cqrs-retry
+          - cqrs-lock
+          - cqrs-transaction-cycle
+          - cqrs-transport
+          - cqrs-transport-console
+          - cqrs-transport-cycle
+    services:
+      mysql:
+        image: ${{ matrix.package == 'cqrs-transport-cycle' && 'mysql:8.4' || '' }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cqrs_transport
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_sqlite, pdo_mysql
+          coverage: none
+          tools: composer:v2
+      - name: Verify external source with the prospective CQRS 5 dependency graph
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          workspace="$(mktemp -d "$RUNNER_TEMP/cqrs-external.XXXXXX")"
+          trap 'rm -rf "$workspace"' EXIT
+          if [ "$PACKAGE" = cqrs-transport-cycle ]; then
+            export CQRS_TRANSPORT_TEST_MYSQL_DSN='mysql:host=127.0.0.1;port=3306;dbname=cqrs_transport'
+            export CQRS_TRANSPORT_TEST_MYSQL_USER=root
+            export CQRS_TRANSPORT_TEST_MYSQL_PASSWORD=root
+          fi
+          php tests/compatibility/external-packages.php "$PACKAGE" "$workspace"
