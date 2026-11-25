@@ -15,12 +15,13 @@ permissions:
 
 jobs:
   candidate:
-    name: Candidate (${{ matrix.package }}, ${{ matrix.profile }})
+    name: Candidate (${{ matrix.package }}, PHP ${{ matrix.php }}, ${{ matrix.profile }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         profile: [default]
+        php: ['8.5', '8.6']
         package:
           - cqrs-app
           - cqrs-app-integration
@@ -34,12 +35,16 @@ jobs:
         include:
           - package: cqrs-lock
             profile: minimum
+            php: '8.5.13'
           - package: cqrs-transaction-cycle
             profile: minimum
+            php: '8.5.13'
           - package: cqrs-transport-console
             profile: minimum
+            php: '8.5.13'
           - package: cqrs-transport-cycle
             profile: minimum
+            php: '8.5.13'
     services:
       mysql:
         image: ${{ matrix.package == 'cqrs-transport-cycle' && 'mysql:8.4' || '' }}
@@ -59,7 +64,7 @@ jobs:
           persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.profile == 'minimum' && '8.5.13' || '8.5' }}
+          php-version: ${{ matrix.php }}
           extensions: mbstring, pdo_sqlite, pdo_mysql
           coverage: none
           tools: composer:v2

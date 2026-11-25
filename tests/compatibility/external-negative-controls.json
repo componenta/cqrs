@@ -49,6 +49,18 @@
                     "$context->getAttribute(self::ATTR_SKIP_POLICY) == true"
                 ]
             ]
+        },
+        {
+            "label": "reauthorize the enqueued command",
+            "source": "src/Command/Middleware/PolicyMiddleware.php",
+            "test": "tests/Policy/Transport/ActorAwareWorkerIntegrationTest.php",
+            "filter": "reauthorizes an enqueued command against the current actor and never executes it after access is revoked",
+            "edits": [
+                [
+                    "if (($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) === true) {",
+                    "if (($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) === true || isset($operation->attributes['__original_operation_id'])) {"
+                ]
+            ]
         }
     ],
     "cqrs-retry": [
@@ -145,6 +157,18 @@
                 [
                     "            if ($timeLimit !== null) {\n                $now = hrtime();\n                $elapsedSeconds = $now[0] - $startTime[0]\n                    - (int) ($now[1] < $startTime[1]);\n\n                if ($elapsedSeconds >= $timeLimit) {\n                    $io->info(\"Time limit reached: $timeLimit seconds\");\n                    break;\n                }\n            }",
                     "            if ($timeLimit !== null && (hrtime()[0] - $startTime) >= $timeLimit) {\n                $io->info(\"Time limit reached: $timeLimit seconds\");\n                break;\n            }"
+                ]
+            ]
+        },
+        {
+            "label": "console stop before idle sleep",
+            "source": "src/Command/Transport/Console/WorkerCommand.php",
+            "test": "tests/WorkerCommandCompatibilityTest.php",
+            "filter": "honors a stop signal received during an empty poll without another idle wait",
+            "edits": [
+                [
+                    "} elseif ($this->activeWorker() !== null) {",
+                    "} else {"
                 ]
             ]
         }
