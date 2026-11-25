@@ -75,6 +75,30 @@
                     "$attempt >= $retry->attempts"
                 ]
             ]
+        },
+        {
+            "label": "configured exception matching",
+            "source": "src/Command/Middleware/RetryMiddleware.php",
+            "test": "tests/Command/Middleware/RetryMiddlewareTest.php",
+            "filter": "propagates the original failure without retrying when metadata or eligibility excludes retry",
+            "edits": [
+                [
+                    "static fn (string $exceptionClass): bool => $e instanceof $exceptionClass,",
+                    "static fn (string $exceptionClass): bool => true,"
+                ]
+            ]
+        },
+        {
+            "label": "minimum retry attempts",
+            "source": "src/Retry/Attribute/Retry.php",
+            "test": "tests/RetryAttributeTest.php",
+            "filter": "rejects invalid retry attempt and delay configuration",
+            "edits": [
+                [
+                    "$attempts < 1",
+                    "$attempts < 0"
+                ]
+            ]
         }
     ],
     "cqrs-lock": [
@@ -87,6 +111,18 @@
                 [
                     "$lock->release();",
                     "// Omit lock release."
+                ]
+            ]
+        },
+        {
+            "label": "nonzero lock lifetime",
+            "source": "src/Lock/Attribute/Lock.php",
+            "test": "tests/LockAttributeTest.php",
+            "filter": "rejects non-positive or non-finite lock lifetimes",
+            "edits": [
+                [
+                    "$ttl <= 0.0",
+                    "$ttl < 0.0"
                 ]
             ]
         }
@@ -139,6 +175,18 @@
                 [
                     "if (!$this->processOne() && !$this->shouldStop)",
                     "if (!$this->processOne())"
+                ]
+            ]
+        },
+        {
+            "label": "both composite serializer contracts",
+            "source": "src/Command/Transport/CompositeCommandSerializer.php",
+            "test": "tests/Command/Transport/CompositeCommandSerializerTest.php",
+            "filter": "requires each of the two serializer contracts rather than accepting either one alone",
+            "edits": [
+                [
+                    "|| !$serializer instanceof CommandSerializerSupportInterface",
+                    "&& !$serializer instanceof CommandSerializerSupportInterface"
                 ]
             ]
         }
