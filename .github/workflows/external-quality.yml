@@ -1,0 +1,77 @@
+name: External CQRS mutation audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/compatibility/external-mutate.php'
+      - '.github/workflows/external-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Mutation (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - cqrs-app
+          - cqrs-policy
+          - cqrs-retry
+          - cqrs-lock
+          - cqrs-transaction-cycle
+          - cqrs-transport
+          - cqrs-transport-console
+          - cqrs-transport-cycle
+    services:
+      mysql:
+        image: ${{ matrix.package == 'cqrs-transport-cycle' && 'mysql:8.4' || '' }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cqrs_transport
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_sqlite, pdo_mysql, pcntl
+          coverage: xdebug
+          tools: composer:v2
+      - name: Check external package and run verified mutation workers
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          XDEBUG_MODE: coverage
+        run: |
+          set -euo pipefail
+          workspace="$(mktemp -d "$RUNNER_TEMP/cqrs-quality.XXXXXX")"
+          trap 'rm -rf "$workspace"' EXIT
+          if [ "$PACKAGE" = cqrs-transport-cycle ]; then
+            export CQRS_TRANSPORT_TEST_MYSQL_DSN='mysql:host=127.0.0.1;port=3306;dbname=cqrs_transport'
+            export CQRS_TRANSPORT_TEST_MYSQL_USER=root
+            export CQRS_TRANSPORT_TEST_MYSQL_PASSWORD=root
+          fi
+          XDEBUG_MODE=off php tests/compatibility/external-packages.php "$PACKAGE" "$workspace"
+          export CQRS_EXTERNAL_MUTATION_CONTROL_SOURCE="$(php -r '$controls = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR); echo $controls[$argv[2]][0]["source"];' tests/compatibility/external-negative-controls.json "$PACKAGE")"
+          cp tests/compatibility/external-mutate.php "$workspace/package/cqrs-mutation.php"
+          cd "$workspace/package"
+          config=phpunit.xml.dist
+          if [ -f phpunit.xml ]; then
+            config=phpunit.xml
+          fi
+          php -d opcache.enable_cli=0 cqrs-mutation.php --configuration="$config" --mutate --everything --no-cache
+          git diff --exit-code -- src
