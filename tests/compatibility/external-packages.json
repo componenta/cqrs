@@ -1,13 +1,13 @@
 {
-    "cqrs-app": "4e8ac743c12037ca29e6b8cdd44495a2fc8d4bea",
+    "cqrs-app": "5511f05dc21708f8ba0d74fb82811f564b7d7776",
     "cqrs-policy": "ef1d969623c8ef983277012ecd2286e353bd043f",
     "cqrs-retry": "70e15e04a4c4bda76f9292e0ced54f5b9274c003",
     "cqrs-lock": "28610643a412820b6addd34758546a0c8a603b9b",
     "cqrs-transaction-cycle": "2ae82c182737487f53c879eca3f8a0bf5ad4f97a",
-    "cqrs-transport": "4be1cc5c1963f999725015b5e57a81e41cf3bcdc",
+    "cqrs-transport": "44fc5b747643e5e71b062e2c6e22e3c93260ebfb",
     "cqrs-transport-console": "4d8650b9182d13b7815e19366b6737badb270c0a",
-    "cqrs-transport-cycle": "2f642103cb4de949e20a97d7d565b36783dfd85d",
-    "di": "2361c398fc938108de67df8ec6a723bf4c4648ff",
+    "cqrs-transport-cycle": "31ed7e3503809b25b6d157264d931f2055f58858",
+    "di": "be3a55f049a8ece7073155eedff241334fdfc83b",
     "app": "v5.0.0",
     "app-console": "v5.0.0",
     "policy": "v3.0.0"

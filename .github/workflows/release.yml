@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: componenta/di
-          ref: 2361c398fc938108de67df8ec6a723bf4c4648ff
+          ref: be3a55f049a8ece7073155eedff241334fdfc83b
           path: .ci/di6
           persist-credentials: false
       - name: Allow the pinned development dependency in CI only
@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: componenta/di
-          ref: 2361c398fc938108de67df8ec6a723bf4c4648ff
+          ref: be3a55f049a8ece7073155eedff241334fdfc83b
           path: .ci/di6
           persist-credentials: false
       - name: Install production dependencies in an isolated consumer

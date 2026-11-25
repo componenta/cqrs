@@ -11,6 +11,18 @@
                     "], ['command_handlers' => [], 'query_handlers' => [], 'command_listeners' => []]);"
                 ]
             ]
+        },
+        {
+            "label": "discovery reentry isolation",
+            "source": "src/Discovery/CqrsDiscoveryIndex.php",
+            "test": "tests/Discovery/LazyDiscoveryTest.php",
+            "filter": "rejects reentrant discovery without corrupting the active scan",
+            "edits": [
+                [
+                    "        if ($this->loading) {\n            throw new LogicException('CQRS discovery is already in progress.');\n        }\n",
+                    ""
+                ]
+            ]
         }
     ],
     "cqrs-policy": [
@@ -105,6 +117,18 @@
                     "// Omit logging."
                 ]
             ]
+        },
+        {
+            "label": "worker stop before idle sleep",
+            "source": "src/Command/Transport/CommandWorker.php",
+            "test": "tests/Command/Transport/CommandWorkerDispositionTest.php",
+            "filter": "stops an idle polling loop without sleeping after a stop request during polling",
+            "edits": [
+                [
+                    "if (!$this->processOne() && !$this->shouldStop)",
+                    "if (!$this->processOne())"
+                ]
+            ]
         }
     ],
     "cqrs-transport-console": [
@@ -135,6 +159,18 @@
                 [
                     "if (!$this->database->rollback()) {",
                     "if (false) {"
+                ]
+            ]
+        },
+        {
+            "label": "strict database clock validation",
+            "source": "src/Command/Transport/DatabaseTransport.php",
+            "test": "tests/DatabaseTransportDatabaseClockTest.php",
+            "filter": "rejects malformed or relative database timestamps before persisting or changing delivery state",
+            "edits": [
+                [
+                    "            $parsed = date_parse($value);\n            if ($parsed['warning_count'] !== 0\n                || $parsed['error_count'] !== 0\n                || isset($parsed['relative'])\n                || $parsed['year'] === false\n                || $parsed['month'] === false\n                || $parsed['day'] === false\n                || $parsed['hour'] === false\n                || $parsed['minute'] === false\n                || $parsed['second'] === false\n            ) {\n                throw new InvalidArgumentException('Expected a complete absolute timestamp.');\n            }\n\n",
+                    ""
                 ]
             ]
         }
