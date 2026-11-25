@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'tests/compatibility/external-mutate.php'
+      - 'tests/compatibility/external-packages.json'
+      - 'tests/compatibility/external-negative-controls.json'
       - '.github/workflows/external-quality.yml'
 
 permissions:

@@ -23,6 +23,18 @@
                     ""
                 ]
             ]
+        },
+        {
+            "label": "reject blank map path",
+            "source": "src/Factory/CqrsMapsFactory.php",
+            "test": "tests/RuntimeMapsTest.php",
+            "filter": "rejects an invalid configured map path before discovery or artifact publication",
+            "edits": [
+                [
+                    "trim($path) === ''",
+                    "$path === ''"
+                ]
+            ]
         }
     ],
     "cqrs-policy": [
@@ -59,6 +71,18 @@
                 [
                     "if (($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) === true) {",
                     "if (($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) === true || isset($operation->attributes['__original_operation_id'])) {"
+                ]
+            ]
+        },
+        {
+            "label": "reject unknown actor-aware wire fields before repository access",
+            "source": "src/Policy/Transport/ActorAwareJsonCommandSerializer.php",
+            "test": "tests/Policy/Transport/ActorAwareJsonCommandSerializerTest.php",
+            "filter": "rejects unknown actor-aware command fields without consulting the actor repository",
+            "edits": [
+                [
+                    "if ($unknownFields !== []) {",
+                    "if (false) {"
                 ]
             ]
         }
@@ -99,6 +123,18 @@
                     "$attempts < 0"
                 ]
             ]
+        },
+        {
+            "label": "default retry sleep units",
+            "source": "src/Command/Middleware/RetryMiddleware.php",
+            "test": "tests/Command/Middleware/RetryMiddlewareTest.php",
+            "filter": "converts the configured default retry wait from milliseconds into microseconds",
+            "edits": [
+                [
+                    "usleep($milliseconds * 1000);",
+                    "usleep($milliseconds);"
+                ]
+            ]
         }
     ],
     "cqrs-lock": [
@@ -123,6 +159,30 @@
                 [
                     "$ttl <= 0.0",
                     "$ttl < 0.0"
+                ]
+            ]
+        },
+        {
+            "label": "nested main-context lock depth cleanup",
+            "source": "src/Command/Middleware/Internal/LockExecutionState.php",
+            "test": "tests/ResourceLockMiddlewareReentrancyTest.php",
+            "filter": "retains independent resource ownership through three nested dispatches in the same execution context",
+            "edits": [
+                [
+                    "--$this->main[$key];",
+                    "// Omit depth decrement."
+                ]
+            ]
+        },
+        {
+            "label": "nested fiber lock depth cleanup",
+            "source": "src/Command/Middleware/Internal/LockExecutionState.php",
+            "test": "tests/ResourceLockMiddlewareReentrancyTest.php",
+            "filter": "retains independent resource ownership through three nested dispatches in the same execution context",
+            "edits": [
+                [
+                    "--$locks[$key];",
+                    "// Omit depth decrement."
                 ]
             ]
         }
@@ -189,6 +249,42 @@
                     "&& !$serializer instanceof CommandSerializerSupportInterface"
                 ]
             ]
+        },
+        {
+            "label": "reject mismatched deserialized command type",
+            "source": "src/Command/Transport/CommandWorker.php",
+            "test": "tests/Command/Transport/CommandWorkerDispositionTest.php",
+            "filter": "rejects an envelope when a custom deserializer returns the wrong command type",
+            "edits": [
+                [
+                    "if (!$command instanceof $commandClass) {",
+                    "if (false) {"
+                ]
+            ]
+        },
+        {
+            "label": "reject invalid custom operation context before dispatch",
+            "source": "src/Command/Transport/CommandWorker.php",
+            "test": "tests/Command/Transport/CommandWorkerTest.php",
+            "filter": "rejects invalid or reserved attributes returned by a custom context serializer",
+            "edits": [
+                [
+                    "self::assertAttributeName($attribute, 'Transported operation context');",
+                    "// Omit context name validation."
+                ]
+            ]
+        },
+        {
+            "label": "validate incoming non-finite context numbers",
+            "source": "src/Command/Transport/JsonOperationContextSerializer.php",
+            "test": "tests/Command/Transport/JsonOperationContextSerializerTest.php",
+            "filter": "rejects non-finite decoded values even when their attributes are allowlisted",
+            "edits": [
+                [
+                    "            self::assertJsonValue($value, $attribute);\n        }\n\n        /** @var array<string, mixed> $context */",
+                    "            // Omit decoded value validation.\n        }\n\n        /** @var array<string, mixed> $context */"
+                ]
+            ]
         }
     ],
     "cqrs-transport-console": [
@@ -219,6 +315,18 @@
                     "} else {"
                 ]
             ]
+        },
+        {
+            "label": "reject blank console transport name",
+            "source": "src/Command/Transport/Console/WorkerCommand.php",
+            "test": "tests/WorkerCommandValidationTest.php",
+            "filter": "rejects a blank transport name before resolving the registry",
+            "edits": [
+                [
+                    "trim($transportName) === ''",
+                    "$transportName === ''"
+                ]
+            ]
         }
     ],
     "cqrs-transport-cycle": [
@@ -243,6 +351,18 @@
                 [
                     "            $parsed = date_parse($value);\n            if ($parsed['warning_count'] !== 0\n                || $parsed['error_count'] !== 0\n                || isset($parsed['relative'])\n                || $parsed['year'] === false\n                || $parsed['month'] === false\n                || $parsed['day'] === false\n                || $parsed['hour'] === false\n                || $parsed['minute'] === false\n                || $parsed['second'] === false\n            ) {\n                throw new InvalidArgumentException('Expected a complete absolute timestamp.');\n            }\n\n",
                     ""
+                ]
+            ]
+        },
+        {
+            "label": "bounded queue claim attempts",
+            "source": "src/Command/Transport/DatabaseTransport.php",
+            "test": "tests/DatabaseTransportTest.php",
+            "filter": "stops after the documented bounded claim attempts and can poll the pending message again",
+            "edits": [
+                [
+                    "private const int CLAIM_ATTEMPTS = 3;",
+                    "private const int CLAIM_ATTEMPTS = 4;"
                 ]
             ]
         }
