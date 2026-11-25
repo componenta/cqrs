@@ -1,0 +1,142 @@
+{
+    "cqrs-app": [
+        {
+            "label": "map conflict",
+            "source": "src/Build/CqrsBuilder.php",
+            "test": "tests/Build/CqrsBuilderTest.php",
+            "filter": "preserves the published map when a discovered handler conflicts with explicit registration",
+            "edits": [
+                [
+                    "], $explicit);",
+                    "], ['command_handlers' => [], 'query_handlers' => [], 'command_listeners' => []]);"
+                ]
+            ]
+        }
+    ],
+    "cqrs-policy": [
+        {
+            "label": "strict command policy bypass",
+            "source": "src/Command/Middleware/PolicyMiddleware.php",
+            "test": "tests/Command/Middleware/PolicyMiddlewareTest.php",
+            "filter": "never bypasses denied command policies for non-boolean or false skip flags",
+            "edits": [
+                [
+                    "($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) === true",
+                    "($operation->attributes[self::ATTR_SKIP_POLICY] ?? false) == true"
+                ]
+            ]
+        },
+        {
+            "label": "strict query policy bypass",
+            "source": "src/Query/Middleware/PolicyMiddleware.php",
+            "test": "tests/Query/Middleware/PolicyMiddlewareTest.php",
+            "filter": "never bypasses denied query policies for non-boolean or false skip flags",
+            "edits": [
+                [
+                    "$context->getAttribute(self::ATTR_SKIP_POLICY) === true",
+                    "$context->getAttribute(self::ATTR_SKIP_POLICY) == true"
+                ]
+            ]
+        }
+    ],
+    "cqrs-retry": [
+        {
+            "label": "retry eligibility",
+            "source": "src/Command/Middleware/RetryMiddleware.php",
+            "test": "tests/Command/Middleware/RetryMiddlewareTest.php",
+            "filter": "propagates the original failure without retrying when metadata or eligibility excludes retry",
+            "edits": [
+                [
+                    "$attempt >= $retry->attempts || !$this->isRetryable($e)",
+                    "$attempt >= $retry->attempts"
+                ]
+            ]
+        }
+    ],
+    "cqrs-lock": [
+        {
+            "label": "release real resource lock",
+            "source": "src/Command/Middleware/ResourceLockMiddleware.php",
+            "test": "tests/ResourceLockMiddlewareReentrancyTest.php",
+            "filter": "holds the real lock throughout nested execution and releases it on success or failure",
+            "edits": [
+                [
+                    "$lock->release();",
+                    "// Omit lock release."
+                ]
+            ]
+        }
+    ],
+    "cqrs-transaction-cycle": [
+        {
+            "label": "commit before returning",
+            "source": "src/Command/Middleware/TransactionMiddleware.php",
+            "test": "tests/TransactionMiddlewareFailureTest.php",
+            "filter": "returns the downstream operation only after committing the transaction",
+            "edits": [
+                [
+                    "if (!$this->database->commit()) {",
+                    "if (false) {"
+                ]
+            ]
+        }
+    ],
+    "cqrs-transport": [
+        {
+            "label": "trusted worker attribute snapshot",
+            "source": "src/Command/Transport/CommandWorker.php",
+            "test": "tests/Command/Transport/CommandWorkerTest.php",
+            "filter": "re-dispatches transported commands with restored operation context and worker attributes",
+            "edits": [
+                [
+                    "$this->dispatchAttributes = $snapshot;",
+                    "$this->dispatchAttributes = $dispatchAttributes;"
+                ]
+            ]
+        },
+        {
+            "label": "delivery logging",
+            "source": "src/Command/Transport/CommandWorker.php",
+            "test": "tests/Command/Transport/CommandWorkerDispositionTest.php",
+            "filter": "does not alter delivery disposition when a logger throws",
+            "edits": [
+                [
+                    "$this->logger->log($level, $message, $context);",
+                    "// Omit logging."
+                ]
+            ]
+        }
+    ],
+    "cqrs-transport-console": [
+        {
+            "label": "fractional monotonic runtime regression",
+            "source": "src/Command/Transport/Console/WorkerCommand.php",
+            "test": "tests/WorkerCommandCompatibilityTest.php",
+            "filter": "does not expire a one-second runtime limit at an earlier integer-second boundary",
+            "edits": [
+                [
+                    "$startTime = hrtime();",
+                    "$startTime = hrtime()[0];"
+                ],
+                [
+                    "            if ($timeLimit !== null) {\n                $now = hrtime();\n                $elapsedSeconds = $now[0] - $startTime[0]\n                    - (int) ($now[1] < $startTime[1]);\n\n                if ($elapsedSeconds >= $timeLimit) {\n                    $io->info(\"Time limit reached: $timeLimit seconds\");\n                    break;\n                }\n            }",
+                    "            if ($timeLimit !== null && (hrtime()[0] - $startTime) >= $timeLimit) {\n                $io->info(\"Time limit reached: $timeLimit seconds\");\n                break;\n            }"
+                ]
+            ]
+        }
+    ],
+    "cqrs-transport-cycle": [
+        {
+            "label": "dead-letter rejection rollback",
+            "source": "src/Command/Transport/DatabaseTransport.php",
+            "test": "tests/DatabaseTransportTest.php",
+            "filter": "rolls back the rejection tombstone when the dead-letter insert fails and keeps the receipt usable",
+            "edits": [
+                [
+                    "if (!$this->database->rollback()) {",
+                    "if (false) {"
+                ]
+            ]
+        }
+    ]
+}

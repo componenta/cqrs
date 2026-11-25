@@ -217,4 +217,6 @@ foreach ([
 if ($failed !== []) {
     throw new RuntimeException('Failed checks: ' . implode(', ', $failed));
 }
+require __DIR__ . '/external-negative-controls.php';
+verifyExternalNegativeControls($package, $target);
 echo "External package acceptance passed: ", $package, PHP_EOL;
