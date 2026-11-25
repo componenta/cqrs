@@ -10,6 +10,16 @@ declare(strict_types=1);
 $root = dirname(__DIR__, 2);
 $package = $argv[1] ?? '';
 $workspace = $argv[2] ?? '';
+$profile = $argv[3] ?? 'default';
+$minimums = [
+    'cqrs-lock' => ['symfony/lock' => '7.4.0'],
+    'cqrs-transaction-cycle' => ['cycle/database' => '2.15.0'],
+    'cqrs-transport-console' => ['symfony/console' => '7.4.0'],
+    'cqrs-transport-cycle' => ['cycle/database' => '2.21.0'],
+];
+if ($profile !== 'default' && ($profile !== 'minimum' || !isset($minimums[$package]))) {
+    throw new InvalidArgumentException('Unsupported compatibility profile.');
+}
 $pins = json_decode(file_get_contents(__DIR__ . '/external-packages.json'), true, flags: JSON_THROW_ON_ERROR);
 $extras = [
     'cqrs-app' => ['app', 'app-console'],
@@ -187,6 +197,15 @@ foreach ($selected as $dependency) {
 
 $manifest = migrateRequirements(manifest($target));
 $manifest['repositories'] = $repositories;
+if ($profile === 'minimum') {
+    foreach ($minimums[$package] as $dependency => $version) {
+        if (!isset($manifest['require'][$dependency])) {
+            throw new RuntimeException('Minimum version must target a direct production dependency: ' . $dependency);
+        }
+        echo 'Testing minimum ', $dependency, ' ', $version, PHP_EOL;
+        $manifest['require'][$dependency] = $version;
+    }
+}
 foreach ($selected as $dependency) {
     $name = 'componenta/' . $dependency;
     $section = isset($manifest['require'][$name]) ? 'require' : 'require-dev';
@@ -200,6 +219,13 @@ $locked = array_column(array_merge($lock['packages'], $lock['packages-dev']), 'v
 foreach ($selected as $dependency) {
     if (($locked['componenta/' . $dependency] ?? null) !== $versions[$dependency]) {
         throw new RuntimeException('Unexpected candidate version of ' . $dependency);
+    }
+}
+if ($profile === 'minimum') {
+    foreach ($minimums[$package] as $dependency => $version) {
+        if (ltrim($locked[$dependency] ?? '', 'v') !== $version) {
+            throw new RuntimeException('Minimum version was not installed: ' . $dependency);
+        }
     }
 }
 echo "Prospective graph installed; exact candidate development versions verified.\n";

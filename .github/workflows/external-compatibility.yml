@@ -15,11 +15,12 @@ permissions:
 
 jobs:
   candidate:
-    name: Candidate (${{ matrix.package }})
+    name: Candidate (${{ matrix.package }}, ${{ matrix.profile }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        profile: [default]
         package:
           - cqrs-app
           - cqrs-app-integration
@@ -30,6 +31,15 @@ jobs:
           - cqrs-transport
           - cqrs-transport-console
           - cqrs-transport-cycle
+        include:
+          - package: cqrs-lock
+            profile: minimum
+          - package: cqrs-transaction-cycle
+            profile: minimum
+          - package: cqrs-transport-console
+            profile: minimum
+          - package: cqrs-transport-cycle
+            profile: minimum
     services:
       mysql:
         image: ${{ matrix.package == 'cqrs-transport-cycle' && 'mysql:8.4' || '' }}
@@ -49,7 +59,7 @@ jobs:
           persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.5'
+          php-version: ${{ matrix.profile == 'minimum' && '8.5.13' || '8.5' }}
           extensions: mbstring, pdo_sqlite, pdo_mysql
           coverage: none
           tools: composer:v2
@@ -57,6 +67,7 @@ jobs:
         shell: bash
         env:
           PACKAGE: ${{ matrix.package }}
+          PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
           workspace="$(mktemp -d "$RUNNER_TEMP/cqrs-external.XXXXXX")"
@@ -66,4 +77,4 @@ jobs:
             export CQRS_TRANSPORT_TEST_MYSQL_USER=root
             export CQRS_TRANSPORT_TEST_MYSQL_PASSWORD=root
           fi
-          php tests/compatibility/external-packages.php "$PACKAGE" "$workspace"
+          php tests/compatibility/external-packages.php "$PACKAGE" "$workspace" "$PROFILE"
