@@ -27,6 +27,7 @@ dispatch, configured services, immutable operation metadata, and result contract
 It runs against the consumer's production dependencies without the package's
 development autoload configuration.
 
+The consumer installs published branch commits and records them in its lock file.
 The root explicitly opts into each required development branch. Every support
 branch declares its real major through `extra.branch-alias`; the repositories do
 not override versions and the root keeps `minimum-stability: stable`. Scope Git VCS

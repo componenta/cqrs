@@ -19,11 +19,11 @@
     },
     "repositories": [
         {
-            "type": "path",
-            "url": "../..",
-            "options": {
-                "symlink": false
-            }
+            "type": "git",
+            "url": "https://github.com/componenta/cqrs.git",
+            "only": [
+                "componenta/cqrs"
+            ]
         },
         {
             "type": "git",
