@@ -20,23 +20,35 @@ jobs:
           coverage: none
           tools: composer:v2
       - run: composer validate --strict
-      # Development verification uses a pinned DI 6 source snapshot until the
-      # dependency is released. Release verification MUST use stable packages.
+      # Development verification uses pinned DI 6 and Config 4 compatible Identity
+      # snapshots until those dependencies are released. Release verification MUST use stable packages.
       - name: Checkout DI 6 for development verification
         if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
         uses: actions/checkout@v7
         with:
           repository: componenta/di
-          ref: be3a55f049a8ece7073155eedff241334fdfc83b
+          ref: ded9a6dc44db2775c4753e73d9581d70caac6043
           path: .ci/di6
           persist-credentials: false
+      - name: Checkout Config 4 compatible Identity
+        if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
+        uses: actions/checkout@v7
+        with:
+          repository: componenta/identity
+          ref: 3feb94e0d64956ecdf7b22abed4a8bd9f597abeb
+          path: .ci/identity
+          persist-credentials: false
+      - name: Expose the declared development branch aliases
+        if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
+        shell: bash
+        run: |
+          git -C .ci/di6 switch --create fix/callback-dependency-baseline-2026-11-26
+          git -C .ci/identity switch --create fix/callback-dependency-baseline-2026-11-26
       - name: Allow the pinned development dependency in CI only
         if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
         shell: bash
         run: |
-          git -C .ci/di6 rev-parse HEAD
-          composer config repositories.di6 '{"type":"path","url":".ci/di6","options":{"symlink":false,"versions":{"componenta/di":"6.0.x-dev"}}}'
-          composer require 'componenta/di:^6.0@dev' --no-update --no-interaction
+          php .github/prepare-development-dependencies.php "$PWD" "$PWD/.ci"
       - run: composer install --no-interaction --prefer-dist
       - run: composer show componenta/di
       # Dev tooling (PHPBench) still pulls abandoned doctrine/annotations.
@@ -70,9 +82,7 @@ jobs:
             # A changed dependency or benchmark fixture requires its own checkout.
             git archive "$BASE_SHA" | tar -x -C "$baseline"
             if [ -d .ci/di6 ]; then
-              repository="$(php -r 'echo json_encode(["type"=>"path","url"=>$argv[1],"options"=>["symlink"=>false,"versions"=>["componenta/di"=>"6.0.x-dev"]]], JSON_THROW_ON_ERROR);' "$GITHUB_WORKSPACE/.ci/di6")"
-              composer config --working-dir="$baseline" repositories.di6 "$repository"
-              composer require --working-dir="$baseline" 'componenta/di:^6.0@dev' --no-update --no-interaction
+              php .github/prepare-development-dependencies.php "$baseline" "$GITHUB_WORKSPACE/.ci"
             fi
             composer install --working-dir="$baseline" --no-interaction --prefer-dist
             php benchmarks/compare-dependencies.php "$baseline/composer.lock" composer.lock
@@ -106,17 +116,32 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: componenta/di
-          ref: be3a55f049a8ece7073155eedff241334fdfc83b
+          ref: ded9a6dc44db2775c4753e73d9581d70caac6043
           path: .ci/di6
           persist-credentials: false
+      - name: Checkout Config 4 compatible Identity
+        if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
+        uses: actions/checkout@v7
+        with:
+          repository: componenta/identity
+          ref: 3feb94e0d64956ecdf7b22abed4a8bd9f597abeb
+          path: .ci/identity
+          persist-credentials: false
+      - name: Expose the declared development branch aliases
+        if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release v')
+        shell: bash
+        run: |
+          git -C .ci/di6 switch --create fix/callback-dependency-baseline-2026-11-26
+          git -C .ci/identity switch --create fix/callback-dependency-baseline-2026-11-26
       - name: Install production dependencies in an isolated consumer
         shell: bash
         run: |
           set -euo pipefail
           workspace="$(mktemp -d "$RUNNER_TEMP/cqrs-consumer.XXXXXX")"
           trap 'rm -rf "$workspace"' EXIT
-          mkdir "$workspace/package" "$workspace/consumer"
-          git archive HEAD | tar -x -C "$workspace/package"
+          mkdir "$workspace/consumer"
+          git clone --quiet --no-hardlinks "$GITHUB_WORKSPACE" "$workspace/package"
+          git -C "$workspace/package" switch --force-create fix/callback-dependency-baseline-2026-11-26 "$GITHUB_SHA"
           cat > "$workspace/consumer/composer.json" <<'JSON'
           {
             "require": {"componenta/cqrs": "^5.0@dev"},
@@ -124,7 +149,7 @@ jobs:
               "cqrs": {
                 "type": "path",
                 "url": "../package",
-                "options": {"symlink": false, "versions": {"componenta/cqrs": "5.0.x-dev"}}
+                "options": {"symlink": false}
               }
             },
             "minimum-stability": "stable",
@@ -132,10 +157,7 @@ jobs:
           }
           JSON
           if [ -d .ci/di6 ]; then
-            mkdir "$workspace/di"
-            git -C .ci/di6 archive HEAD | tar -x -C "$workspace/di"
-            composer config --working-dir="$workspace/consumer" repositories.di6 '{"type":"path","url":"../di","options":{"symlink":false,"versions":{"componenta/di":"6.0.x-dev"}}}'
-            composer require --working-dir="$workspace/consumer" 'componenta/di:^6.0@dev' --no-update --no-interaction
+            php .github/prepare-development-dependencies.php "$workspace/consumer" "$GITHUB_WORKSPACE/.ci"
           fi
           composer update --working-dir="$workspace/consumer" --no-dev --prefer-lowest --prefer-stable --no-interaction --prefer-dist
           composer audit --working-dir="$workspace/consumer" --locked --no-dev --no-interaction

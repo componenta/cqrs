@@ -13,10 +13,10 @@
     "require": {
         "php": "^8.5.13",
         "php-64bit": "*",
-        "componenta/config": "^3.0.0",
+        "componenta/config": "^4.0",
         "componenta/di": "^6.0",
         "componenta/identity": "^1.1.0",
-        "componenta/reflection": "^2.0.1",
+        "componenta/reflection": "^3.0",
         "psr/clock": "^1.0",
         "psr/container": "^2.0"
     },
@@ -44,7 +44,8 @@
     "minimum-stability": "stable",
     "extra": {
         "branch-alias": {
-            "dev-main": "5.0.x-dev"
+            "dev-main": "5.0.x-dev",
+            "dev-fix/callback-dependency-baseline-2026-11-26": "5.0.x-dev"
         },
         "componenta": {
             "config-providers": [

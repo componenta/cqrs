@@ -145,7 +145,7 @@ $result = $queries->handle(new GetUserQuery($id));
 
 ## Registration and maps
 
-The core package uses arrays and does not scan application classes or read cache files. It requires Config 3 and DI 6. Packages and applications append registration lists through their ConfigProvider:
+The core package uses arrays and does not scan application classes or read cache files. It requires Config 4 and DI 6. Packages and applications append registration lists through their ConfigProvider:
 
 ```php
 use Componenta\CQRS\ConfigKey;
@@ -272,4 +272,8 @@ composer test:negative
 composer bench
 ```
 
-CI runs Pest and PHPStan at maximum level on PHP 8.5 and an isolated production-consumer smoke test with minimum supported dependency versions on PHP 8.6. Development CI verifies a pinned DI 6 source snapshot; release CI installs the declared stable dependencies. The PHPBench suite separates construction, routing, attribute and metadata operations from real DI-backed dispatch. It also measures operation and result creation, UUID generation, the UTC clock, and event creation with propagation stopping. Dependency changes require isolated baseline and candidate installations with matching common dependency versions. Composer audits the full development dependency set for security advisories and enforces a strict production dependency audit.
+CI runs Pest and PHPStan at maximum level on PHP 8.5 and an isolated production-consumer smoke test with minimum supported dependency versions on PHP 8.6. Development CI verifies pinned DI 6 and Config 4 compatible Identity source snapshots; release CI installs the declared stable dependencies. The PHPBench suite separates construction, routing, attribute and metadata operations from real DI-backed dispatch. It also measures operation and result creation, UUID generation, the UTC clock, and event creation with propagation stopping. Dependency changes require isolated baseline and candidate installations with matching common dependency versions. Composer audits the full development dependency set for security advisories and enforces a strict production dependency audit.
+
+### Current dependency integration
+
+The [isolated dependency consumer](integration/latest-dependencies/README.md) installs Config 4, Reflection 3, DI 6, CQRS 5, and the HTTP support graph using their actual development branch aliases. It includes reproducible installation and production-consumer verification commands.

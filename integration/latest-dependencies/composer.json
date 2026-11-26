@@ -1,0 +1,66 @@
+{
+    "name": "componenta-integration/latest-callback-dependencies",
+    "description": "Isolated consumer of the current Componenta callback dependency graph",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5.13",
+        "componenta/config": "^4.0",
+        "componenta/reflection": "^3.0",
+        "componenta/scope": "^1.0",
+        "componenta/http": "^1.0",
+        "componenta/di": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/cqrs": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/identity": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/router": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/middleware-factory": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/http-responder": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "symfony/lock": "^8.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../..",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/di.git",
+            "only": [
+                "componenta/di"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/identity.git",
+            "only": [
+                "componenta/identity"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/router.git",
+            "only": [
+                "componenta/router"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/middleware-factory.git",
+            "only": [
+                "componenta/middleware-factory"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/http-responder.git",
+            "only": [
+                "componenta/http-responder"
+            ]
+        }
+    ],
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
