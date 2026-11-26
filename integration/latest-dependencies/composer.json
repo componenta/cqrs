@@ -15,7 +15,15 @@
         "componenta/router": "dev-fix/callback-dependency-baseline-2026-11-26",
         "componenta/middleware-factory": "dev-fix/callback-dependency-baseline-2026-11-26",
         "componenta/http-responder": "dev-fix/callback-dependency-baseline-2026-11-26",
-        "symfony/lock": "^8.1"
+        "componenta/pipeline": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "componenta/mimetype-detector": "dev-fix/callback-dependency-baseline-2026-11-26",
+        "symfony/lock": "^8.1",
+        "componenta/interceptor": "dev-spec/attribute-callbacks-2026-11-26",
+        "componenta/serialize-interceptor": "dev-spec/attribute-callbacks-2026-11-26",
+        "componenta/cqrs-lock": "dev-spec/attribute-callbacks-2026-11-26",
+        "componenta/cqrs-retry": "dev-spec/attribute-callbacks-2026-11-26",
+        "componenta/http-cache": "dev-spec/attribute-callbacks-2026-11-26",
+        "componenta/policy": "dev-spec/attribute-callbacks-2026-11-26"
     },
     "repositories": [
         {
@@ -58,6 +66,62 @@
             "url": "https://github.com/componenta/http-responder.git",
             "only": [
                 "componenta/http-responder"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/pipeline.git",
+            "only": [
+                "componenta/pipeline"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/mimetype-detector.git",
+            "only": [
+                "componenta/mimetype-detector"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/interceptor.git",
+            "only": [
+                "componenta/interceptor"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/serialize-interceptor.git",
+            "only": [
+                "componenta/serialize-interceptor"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/cqrs-lock.git",
+            "only": [
+                "componenta/cqrs-lock"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/cqrs-retry.git",
+            "only": [
+                "componenta/cqrs-retry"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/http-cache.git",
+            "only": [
+                "componenta/http-cache"
+            ]
+        },
+        {
+            "type": "git",
+            "url": "https://github.com/componenta/policy.git",
+            "only": [
+                "componenta/policy"
             ]
         }
     ],
